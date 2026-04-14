@@ -11,6 +11,8 @@
 </p>
 
 ---
+this is to be removed before release, but don't forget to add little shield icons (rel, ver...)
+and also linking kofi or sum, tips would be great :3
 
 > [!WARNING]
 > **JRTI is currently an experimental public release / proof of concept.**
