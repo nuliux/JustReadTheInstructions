@@ -97,3 +97,6 @@ JustReadTheInstructions\Distribution\GameData\JustReadTheInstructions\
 ```
 
 To install the development build, copy the produced `JustReadTheInstructions` folder into your KSP `GameData` directory.
+
+## License
+MIT

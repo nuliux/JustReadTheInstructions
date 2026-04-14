@@ -17,7 +17,7 @@ namespace JustReadTheInstructions
         public static bool EnableDeferred = true;
         public static bool EnableTUFX = true;
         public static bool EnableEVE = true;
-        public static bool EnableParallax = false; // Parallax is quite heavy, so by default off. TODO : Investiage, if any mitigations possible.
+        public static bool EnableParallax = false; // By default seems very heavy on performance, so start disabled
         public static bool EnableFirefly = true;
         public static bool EnableScatterer = true;
 

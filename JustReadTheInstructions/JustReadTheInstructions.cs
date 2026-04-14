@@ -5,7 +5,8 @@ namespace JustReadTheInstructions
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class JustReadTheInstructions : MonoBehaviour
     {
-        private const string ModVersion = "1.0.0";
+        private static readonly string ModVersion =
+    System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
         private bool _initialized;
 
         void Start()
