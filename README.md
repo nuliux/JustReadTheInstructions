@@ -3,6 +3,17 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/RELMYMathieu/JustReadTheInstructions/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest%20Release-blue" alt="Download Latest Release">
+  </a>
+  <img src="https://img.shields.io/badge/KSP-1.12.x-4c9cff" alt="KSP Version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <a href="https://ko-fi.com/relmymathieu">
+    <img src="https://img.shields.io/badge/Support-Ko--fi-ff5f5f?logo=ko-fi&logoColor=white" alt="Support on Ko-fi">
+  </a>
+</p>
+
+<p align="center">
   A web-viewable Hullcam VDS camera feed mod for Kerbal Space Program.
 </p>
 
