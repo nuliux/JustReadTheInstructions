@@ -3,6 +3,14 @@
 </p>
 
 <p align="center">
+    <a href="https://ko-fi.com/relmymathieu"><img src="https://img.shields.io/badge/ko--fi-support-ff5f5f.svg?style=flat&logo=ko-fi&logoColor=white" alt="Ko-fi"/></a>
+    <a href="https://github.com/RELMYMathieu/JustReadTheInstructions/releases"><img src="https://img.shields.io/github/downloads/RELMYMathieu/JustReadTheInstructions/total.svg?style=flat&logo=github&logoColor=white" alt="Total downloads" /></a>
+    <a href="https://github.com/RELMYMathieu/JustReadTheInstructions/releases/latest"><img src="https://img.shields.io/github/release/RELMYMathieu/JustReadTheInstructions.svg?style=flat&logo=github&logoColor=white" alt="Latest release" /></a>
+    <a href="https://spacedock.info/mod/4212/Just%20Read%20The%20Instructions"><img src="https://img.shields.io/badge/spacedock-download-4f86c6.svg?style=flat&logoColor=white" alt="SpaceDock"/></a>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-97ca00.svg?style=flat&logoColor=white" alt="MIT License" /></a>
+</p>
+
+<p align="center">
   A web-viewable Hullcam VDS camera feed mod for Kerbal Space Program.
 </p>
 
@@ -114,4 +122,4 @@ JustReadTheInstructions\Distribution\GameData\JustReadTheInstructions\
 To install the development build, copy the produced `JustReadTheInstructions` folder into your KSP `GameData` directory.
 
 ## License
-MIT
+This project is licensed under the MIT License.
