@@ -1,0 +1,185 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0d1117;
+  color: #cdd9e5;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #58a6ff;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+}
+
+#cameras {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1rem;
+}
+
+.camera-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.camera-card.offline {
+  border-color: #6e3030;
+}
+
+.preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0d1117;
+  overflow: hidden;
+}
+
+.preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.preview .offline-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: #0d1117;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: #6e7681;
+  font-size: 0.75rem;
+}
+
+.camera-card.offline .preview .offline-overlay {
+  display: flex;
+}
+
+.camera-card.offline .preview img {
+  opacity: 0.15;
+}
+
+.camera-info {
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.camera-name {
+  font-size: 0.8rem;
+  color: #cdd9e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.camera-card.offline .camera-name {
+  color: #6e7681;
+}
+
+.camera-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+a.btn {
+  font-family: inherit;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #cdd9e5;
+}
+
+a.btn:hover {
+  background: #30363d;
+}
+
+a.btn.watch {
+  border-color: #3fb950;
+  color: #3fb950;
+}
+
+a.btn.watch:hover {
+  background: #1a3a1f;
+}
+
+a.btn.watch-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+#empty {
+  color: #8b949e;
+  font-size: 0.85rem;
+  display: none;
+}
+
+#error {
+  color: #f85149;
+  font-size: 0.85rem;
+  display: none;
+}
+
+#copy-fallback {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 9999;
+}
+
+.copy-box {
+  width: min(680px, 100%);
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.copy-title {
+  font-size: 0.8rem;
+  color: #cdd9e5;
+  margin-bottom: 0.5rem;
+}
+
+#copy-input {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #cdd9e5;
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.copy-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
