@@ -21,28 +21,23 @@
 ---
 
 > [!WARNING]
-> **JRTI is currently an experimental public release / proof of concept.**
+> **JRTI is currently an experimental public release.**
 >
-> It is being released to see how people like it, how it behaves on different installs, and how far this idea can be pushed in KSP. Expect rough edges, compatibility quirks, and breaking changes over time.
+> Expect rough edges, compatibility quirks, and breaking changes over time.
 
 ## Overview
 
-**Just Read The Instructions** (**JRTI**) is a mod for **Kerbal Space Program** that allows you to view your **Hullcam VDS** camera feeds in a web browser.
-
-The goal of the project is to push externalized camera viewing in KSP further, in the spirit of **OCISLY**, while exploring how far the game can be taken with this kind of setup.
-
-Even though this release is experimental in nature, it is versioned as **1.0.0** because the project is intended to stay iterative by design rather than wait for some imaginary “perfectly finished” state. In that sense, while experimental, it is still a proper public release.
+**Just Read The Instructions** (**JRTI**) is a mod for **Kerbal Space Program** that lets you view your **Hullcam VDS** camera feeds in a web browser, in the spirit of **OCISLY**.
 
 ## Requirements
 
 * **Kerbal Space Program** `1.12.x`
-* **latest version of [HullcamVDS-Continued](https://github.com/linuxgurugamer/HullcamVDSContinued)**
+* **[HullcamVDS-Continued](https://github.com/linuxgurugamer/HullcamVDSContinued)** (latest version)
 
 ## Features
 
 * View **Hullcam VDS** camera feeds in a web browser
 * Externalize in-game camera views outside the main game window
-* Experimental foundation for pushing KSP camera systems further
 
 ## Screenshot
 
@@ -50,10 +45,11 @@ Even though this release is experimental in nature, it is versioned as **1.0.0**
 
 ## Installation
 
-1. Go to the **Releases** page of this repository
-2. Download the latest release ZIP
-3. Extract the contents of the ZIP
-4. Move the included **JustReadTheInstructions** folder into your KSP **GameData** folder
+**Via CKAN:** Search for `JustReadTheInstructions` in [CKAN](https://github.com/KSP-CKAN/CKAN) and install it from there.
+
+**Via SpaceDock:** Download from the [SpaceDock page](https://spacedock.info/mod/4212/Just%20Read%20The%20Instructions) and follow the manual install steps below.
+
+**Via GitHub:** Download the latest release ZIP from the [Releases page](https://github.com/RELMYMathieu/JustReadTheInstructions/releases), extract it, and move the `JustReadTheInstructions` folder into your KSP `GameData` folder.
 
 Your final install should look like this:
 
@@ -65,7 +61,7 @@ Kerbal Space Program/
 
 ## Customization
 
-The **Loss of Signal** image displayed in the web UI when a camera feed is unavailable can be replaced with any PNG of your choice (recommended resolution: `1920×1080`).
+The **Loss of Signal** image shown in the web UI when a camera feed is unavailable can be replaced with any PNG of your choice (recommended: `1920×1080`).
 
 Replace this file with your own:
 ```text
@@ -73,10 +69,10 @@ GameData/JustReadTheInstructions/Web/images/los.png
 ```
 
 > [!WARNING]
-> Your custom image will be overwritten if you update the mod. Back it up before updating.
+> Your custom image will be overwritten on mod updates. Back it up beforehand.
 
 > [!CAUTION]
-> Editing the HTML page you may find in the Web folder is strongly discouraged and may break the mod's functionality. You are free to do so on your own copy, but it is not supported.
+> Editing files in the `Web` folder is not supported and may break the mod's functionality.
 
 ## For Developers
 
@@ -84,14 +80,14 @@ GameData/JustReadTheInstructions/Web/images/los.png
 
 * Visual Studio 2022, or MSBuild 17+
 * Kerbal Space Program `1.12.x`
-* [HullcamVDS-Continued](https://github.com/linuxgurugamer/HullcamVDSContinued) installed in your KSP's GameData directory
+* [HullcamVDS-Continued](https://github.com/linuxgurugamer/HullcamVDSContinued) installed in your KSP `GameData`
 
 ### Setup
 
 1. Clone the repository
 2. Copy `KSPPath.props.example` to `KSPPath.props` at the repository root
-3. Edit `KSPPath.props` and set `<KSPPath>` to your KSP install directory (at game root level)
-4. If HullcamVDS is installed at a non-standard path, also override `<HullcamVDSPath>`
+3. Set `<KSPPath>` to your KSP install directory
+4. If HullcamVDS is at a non-standard path, also override `<HullcamVDSPath>`
 
 ```xml
 <Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
@@ -103,11 +99,11 @@ GameData/JustReadTheInstructions/Web/images/los.png
 </Project>
 ```
 
-> `KSPPath.props` is gitignored and will never be committed, as it is meant to represent your local game install path.
+> `KSPPath.props` is gitignored and will never be committed.
 
 ### Building
 
-Open `JustReadTheInstructions.sln` in Visual Studio and build it normally, or run:
+Open `JustReadTheInstructions.sln` in Visual Studio and build normally, or run:
 
 ```powershell
 msbuild JustReadTheInstructions.sln /p:Configuration=Release
@@ -119,7 +115,8 @@ The built mod will be output to:
 JustReadTheInstructions\Distribution\GameData\JustReadTheInstructions\
 ```
 
-To install the development build, copy the produced `JustReadTheInstructions` folder into your KSP `GameData` directory.
+Copy the produced `JustReadTheInstructions` folder into your KSP `GameData` to install the development build.
 
 ## License
+
 This project is licensed under the MIT License.
