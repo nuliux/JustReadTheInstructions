@@ -141,6 +141,7 @@ export class CameraRecorder {
         this.startedAt = Date.now();
         if (!this.isLocal) this._localChunks = [];
         this._setState('recording');
+        this._startHeartbeat();
         this._startCanvasPump();
     }
 
@@ -153,7 +154,6 @@ export class CameraRecorder {
         }
         this.pausedAt = Date.now();
         this._setState('paused');
-        if (this.isLocal) this._startHeartbeat();
     }
 
     resume() {
@@ -164,7 +164,6 @@ export class CameraRecorder {
             return;
         }
         this.pausedAt = null;
-        this._stopHeartbeat();
         this._setState('recording');
     }
 
@@ -288,10 +287,14 @@ export class CameraRecorder {
         this._pendingUploads = this._pendingUploads.then(async () => {
             if (this._aborted) return;
             try {
-                await uploadRecordingChunk(sessionId, filename, blob);
+                await this._uploadWithRetry(sessionId, filename, blob);
                 this._notify();
             } catch (err) {
                 console.error('[JRTI] chunk upload failed', err);
+                if (err.message?.includes('410')) {
+                    this._aborted = true;
+                    this._finalize();
+                }
             }
         });
     }
@@ -332,6 +335,21 @@ export class CameraRecorder {
         })();
 
         return this._finalizePromise;
+    }
+
+    async _uploadWithRetry(sessionId, filename, blob) {
+        let lastErr;
+        for (let i = 0; i < 3; i++) {
+            try {
+                await uploadRecordingChunk(sessionId, filename, blob);
+                return;
+            } catch (err) {
+                if (err.message?.includes('410')) throw err;
+                lastErr = err;
+                await new Promise(r => setTimeout(r, 400 * (i + 1)));
+            }
+        }
+        throw lastErr;
     }
 
     _discard() {
@@ -380,7 +398,7 @@ export class CameraRecorder {
         const sessionId = this._sessionId;
         const filename = this._filename;
         this._heartbeatTimer = setInterval(() => {
-            if (this.state !== 'paused' || this._aborted) return;
+            if (this._aborted || !this.isActive) return;
             heartbeatRecording(sessionId, filename);
         }, RECORDER_HEARTBEAT_MS);
     }

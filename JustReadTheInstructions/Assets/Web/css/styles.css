@@ -80,7 +80,11 @@ h1 {
 }
 
     .camera-card.offline {
-        border-color: var(--border-danger);
+        border-color: var(--text-muted);
+    }
+
+    .camera-card.destroyed {
+        border-color: var(--warn);
     }
 
     .camera-card.recording {
