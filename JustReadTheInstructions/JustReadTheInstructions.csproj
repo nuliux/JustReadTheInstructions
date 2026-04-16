@@ -11,8 +11,8 @@
 		<AppDesignerFolder>Properties</AppDesignerFolder>
 		<RootNamespace>JustReadTheInstructions</RootNamespace>
 		<AssemblyName>JustReadTheInstructions</AssemblyName>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<AssemblyVersion>2.0.0.0</AssemblyVersion>
+		<FileVersion>2.0.0.0</FileVersion>
 		<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
 		<FileAlignment>512</FileAlignment>
 		<Deterministic>true</Deterministic>
@@ -177,9 +177,33 @@
 			exit /b 1
 			)
 
+			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\viewer.html" (
+			@echo ERROR: viewer.html missing after copy
+			exit /b 1
+			)
+
+			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\css\styles.css" (
+			@echo ERROR: css\styles.css missing after copy
+			exit /b 1
+			)
+
+			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\js\main.js" (
+			@echo ERROR: js\main.js missing after copy
+			exit /b 1
+			)
+
+			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\js\viewer.js" (
+			@echo ERROR: js\viewer.js missing after copy
+			exit /b 1
+			)
+
 			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\images\los.png" (
 			@echo ERROR: images\los.png missing after copy
 			exit /b 1
+			)
+
+			if not exist "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\recordings\" (
+			MD "$(ProjectDir)Distribution\GameData\$(TargetName)\Web\recordings\"
 			)
 
 			@echo Copying default settings...

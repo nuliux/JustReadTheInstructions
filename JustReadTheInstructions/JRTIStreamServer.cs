@@ -17,7 +17,11 @@ namespace JustReadTheInstructions
 
         private HttpListener _listener;
         private Thread _listenerThread;
+        private Thread _watchdogThread;
         private volatile bool _running;
+
+        private static readonly TimeSpan RecordingIdleTimeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan WatchdogInterval = TimeSpan.FromSeconds(5);
 
         private readonly ConcurrentDictionary<int, CameraStreamState> _states
             = new ConcurrentDictionary<int, CameraStreamState>();
@@ -28,15 +32,27 @@ namespace JustReadTheInstructions
         private readonly ConcurrentDictionary<int, bool> _captureInFlight
             = new ConcurrentDictionary<int, bool>();
 
+        private readonly ConcurrentDictionary<string, RecordingSession> _recordings
+            = new ConcurrentDictionary<string, RecordingSession>();
+
+        private readonly ConcurrentDictionary<string, byte> _finalizedSessions
+            = new ConcurrentDictionary<string, byte>();
+
         private float MinCapturePeriod => 1f / Mathf.Max(1, JRTISettings.StreamMaxFps);
 
         private static readonly string WebRoot =
             KSPUtil.ApplicationRootPath + "GameData/JustReadTheInstructions/Web/";
 
+        private static readonly string RecordingsRoot = Path.Combine(WebRoot, "recordings");
+
+        private static readonly string DefaultLosPath = Path.Combine(WebRoot, "images", "los.png");
+        private static readonly string CustomLosPath = Path.Combine(WebRoot, "images", "customlos.png");
+
         void Awake()
         {
             if (Instance != null) { Destroy(this); return; }
             Instance = this;
+            EnsureRecordingsDirectory();
         }
 
         void Start() => StartServer();
@@ -44,7 +60,20 @@ namespace JustReadTheInstructions
         void OnDestroy()
         {
             StopServer();
+            FinalizeAllRecordings();
             if (Instance == this) Instance = null;
+        }
+
+        private static void EnsureRecordingsDirectory()
+        {
+            try
+            {
+                Directory.CreateDirectory(RecordingsRoot);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[JRTI-Stream]: Could not create recordings directory: {ex.Message}");
+            }
         }
 
         public void RegisterCamera(int cameraId)
@@ -137,6 +166,13 @@ namespace JustReadTheInstructions
             };
             _listenerThread.Start();
 
+            _watchdogThread = new Thread(WatchdogLoop)
+            {
+                IsBackground = true,
+                Name = "JRTI-RecordingWatchdog"
+            };
+            _watchdogThread.Start();
+
             Debug.Log($"[JRTI-Stream]: Web UI at http://localhost:{JRTISettings.StreamPort}/");
         }
 
@@ -162,10 +198,59 @@ namespace JustReadTheInstructions
             _running = false;
             try { _listener?.Stop(); } catch { }
             _listenerThread?.Join(2000);
+            _watchdogThread?.Join(2000);
 
             foreach (var state in _states.Values)
                 state.Dispose();
             _states.Clear();
+        }
+
+        private void WatchdogLoop()
+        {
+            while (_running)
+            {
+                try
+                {
+                    Thread.Sleep(WatchdogInterval);
+                    if (!_running) break;
+
+                    var cutoff = DateTime.UtcNow - RecordingIdleTimeout;
+                    foreach (var kv in _recordings)
+                    {
+                        if (kv.Value.LastActivityUtc < cutoff)
+                        {
+                            _finalizedSessions.TryAdd(kv.Key, 0);
+                            if (_recordings.TryRemove(kv.Key, out var session))
+                            {
+                                try
+                                {
+                                    session.Dispose();
+                                    Debug.Log($"[JRTI-Stream]: Recording auto-finalized (idle): {session.DisplayPath} ({session.BytesWritten} bytes)");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.LogError($"[JRTI-Stream]: Watchdog finalize error: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (ThreadInterruptedException) { break; }
+                catch (Exception ex)
+                {
+                    if (_running)
+                        Debug.LogError($"[JRTI-Stream]: Watchdog error: {ex.Message}");
+                }
+            }
+        }
+
+        private void FinalizeAllRecordings()
+        {
+            foreach (var kv in _recordings)
+            {
+                try { kv.Value.Dispose(); } catch { }
+            }
+            _recordings.Clear();
         }
 
         private void ListenLoop()
@@ -190,18 +275,41 @@ namespace JustReadTheInstructions
         {
             try
             {
-                var path = ctx.Request.Url.AbsolutePath.TrimEnd('/');
+                var path = ctx.Request.Url.AbsolutePath;
+                var trimmed = path == "/" ? "" : path.TrimEnd('/');
 
-                if (path == "" || path == "/index.html")
-                    ServeIndex(ctx);
-                else if (path == "/cameras")
+                if (trimmed == "" || trimmed == "/index.html")
+                {
+                    ServeStaticFile(ctx, "index.html");
+                    return;
+                }
+
+                if (trimmed == "/cameras")
+                {
                     ServeCameraList(ctx);
-                else if (path.StartsWith("/camera/"))
-                    ServeCameraEndpoint(ctx, path);
-                else if (path.StartsWith("/images/"))
-                    ServeStaticImage(ctx, path);
-                else
-                    ServeError(ctx, 404, "Not found");
+                    return;
+                }
+
+                if (trimmed.StartsWith("/recordings/"))
+                {
+                    HandleRecordingEndpoint(ctx, trimmed);
+                    return;
+                }
+
+                if (trimmed.StartsWith("/camera/"))
+                {
+                    ServeCameraEndpoint(ctx, trimmed);
+                    return;
+                }
+
+                var relative = trimmed.TrimStart('/');
+                if (!string.IsNullOrEmpty(relative))
+                {
+                    ServeStaticFile(ctx, relative);
+                    return;
+                }
+
+                ServeError(ctx, 404, "Not found");
             }
             catch (Exception ex)
             {
@@ -210,41 +318,74 @@ namespace JustReadTheInstructions
             }
         }
 
-        private void ServeIndex(HttpListenerContext ctx)
+        private void ServeStaticFile(HttpListenerContext ctx, string relativePath)
         {
-            try
-            {
-                ServeText(ctx, File.ReadAllText(WebRoot + "index.html"), "text/html");
-            }
-            catch (Exception ex)
-            {
-                ServeError(ctx, 500, $"Could not read index.html: {ex.Message}");
-            }
-        }
+            var webRootFull = Path.GetFullPath(WebRoot);
+            var candidate = Path.GetFullPath(Path.Combine(WebRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
 
-        private static void ServeStaticImage(HttpListenerContext ctx, string path)
-        {
-            var relative = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-            var full = Path.GetFullPath(Path.Combine(WebRoot, relative));
+            if (!candidate.StartsWith(webRootFull, StringComparison.Ordinal))
+            {
+                ServeError(ctx, 403, "Forbidden");
+                return;
+            }
 
-            if (!full.StartsWith(Path.GetFullPath(WebRoot)) || !File.Exists(full))
+            if (PathsEqual(candidate, DefaultLosPath) && File.Exists(CustomLosPath))
+            {
+                candidate = CustomLosPath;
+            }
+
+            if (!File.Exists(candidate))
             {
                 ServeError(ctx, 404, "Not found");
                 return;
             }
 
-            var ext = Path.GetExtension(full).ToLowerInvariant();
-            string contentType;
-            if (ext == ".png") contentType = "image/png";
-            else if (ext == ".jpg" || ext == ".jpeg") contentType = "image/jpeg";
-            else contentType = "application/octet-stream";
+            try
+            {
+                var bytes = File.ReadAllBytes(candidate);
+                ctx.Response.ContentType = GetContentType(candidate);
+                ctx.Response.ContentLength64 = bytes.Length;
+                ctx.Response.Headers.Add("Cache-Control", "no-cache");
+                ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                ctx.Response.Close();
+            }
+            catch (Exception ex)
+            {
+                ServeError(ctx, 500, $"Read failed: {ex.Message}");
+            }
+        }
 
-            var bytes = File.ReadAllBytes(full);
-            ctx.Response.ContentType = contentType;
-            ctx.Response.ContentLength64 = bytes.Length;
-            ctx.Response.Headers.Add("Cache-Control", "no-cache");
-            ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
-            ctx.Response.Close();
+        private static readonly StringComparison PathComparison =
+            Path.DirectorySeparatorChar == '\\'
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
+        private static bool PathsEqual(string a, string b)
+            => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), PathComparison);
+
+        private static string GetContentType(string fullPath)
+        {
+            var ext = Path.GetExtension(fullPath).ToLowerInvariant();
+            switch (ext)
+            {
+                case ".html":
+                case ".htm": return "text/html; charset=utf-8";
+                case ".css": return "text/css; charset=utf-8";
+                case ".js":
+                case ".mjs": return "application/javascript; charset=utf-8";
+                case ".json": return "application/json; charset=utf-8";
+                case ".png": return "image/png";
+                case ".jpg":
+                case ".jpeg": return "image/jpeg";
+                case ".gif": return "image/gif";
+                case ".svg": return "image/svg+xml";
+                case ".ico": return "image/x-icon";
+                case ".webm": return "video/webm";
+                case ".mp4": return "video/mp4";
+                case ".mkv": return "video/x-matroska";
+                case ".txt": return "text/plain; charset=utf-8";
+                default: return "application/octet-stream";
+            }
         }
 
         private void ServeCameraList(HttpListenerContext ctx)
@@ -264,7 +405,7 @@ namespace JustReadTheInstructions
                 sb.Append($"\"name\":\"{EscapeJson(name)}\",");
                 sb.Append($"\"streaming\":true,");
                 sb.Append($"\"snapshotUrl\":\"/camera/{id}/snapshot\",");
-                sb.Append($"\"streamUrl\":\"/camera/{id}\"}}");
+                sb.Append($"\"streamUrl\":\"/viewer.html?id={id}\"}}");
                 first = false;
             }
 
@@ -283,7 +424,8 @@ namespace JustReadTheInstructions
 
             if (parts.Length == 2)
             {
-                ServeCameraViewer(ctx, cameraId);
+                ctx.Response.Redirect($"/viewer.html?id={cameraId}");
+                ctx.Response.Close();
                 return;
             }
 
@@ -302,42 +444,174 @@ namespace JustReadTheInstructions
             }
         }
 
-        private static void ServeCameraViewer(HttpListenerContext ctx, int cameraId)
+        private void HandleRecordingEndpoint(HttpListenerContext ctx, string path)
         {
-            string name = HullCameraManager.Instance?.GetCameraDisplayName(cameraId) ?? cameraId.ToString();
-            string safeName = EscapeHtml(name);
-            string html =
-                "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
-                + $"<title>{safeName} - JRTI Stream</title>"
-                + "<style>html,body{margin:0;background:#000;height:100%;overflow:hidden;}img{display:block;width:100%;height:100%;object-fit:contain;}</style>"
-                + "</head><body>"
-                + $"<img id=\"s\" src=\"/camera/{cameraId}/stream\" alt=\"{safeName}\">"
-                + "<script>"
-                + "var img=document.getElementById('s'),base='/camera/" + cameraId + "/stream',offAt=0;"
-                + "img.onerror=function(){"
-                + "if(!offAt)offAt=Date.now();"
-                + "if(Date.now()-offAt>=5000){img.src='/images/los.png';}"
-                + "else{setTimeout(function(){img.src=base+'?r='+Date.now();},2000);}"
-                + "};"
-                + "img.onload=function(){"
-                + "if(img.src.indexOf(base)>=0){offAt=0;}"
-                + "else if(offAt){setTimeout(function(){img.src=base+'?r='+Date.now();},2000);}"
-                + "};"
-                + "setInterval(function(){"
-                + "if(img.src.indexOf('/images/los.png')>=0){"
-                + "fetch('/camera/" + cameraId + "/status').then(function(r){if(r.ok)location.reload();}).catch(function(){}); return;"
-                + "}"
-                + "fetch('/camera/" + cameraId + "/status').then(function(r){"
-                + "if(r.status===404){"
-                + "if(!offAt)offAt=Date.now();"
-                + "if(Date.now()-offAt>=5000)img.src='/images/los.png';"
-                + "}else if(r.ok){offAt=0;}"
-                + "}).catch(function(){});"
-                + "},1000);"
-                + "</script>"
-                + "</body></html>";
+            var parts = path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 3)
+            {
+                ServeError(ctx, 400, "Expected /recordings/<sessionId>/<action>");
+                return;
+            }
 
-            ServeText(ctx, html, "text/html");
+            var sessionId = parts[1];
+            var action = parts[2];
+
+            if (!IsSafeId(sessionId))
+            {
+                ServeError(ctx, 400, "Invalid session id");
+                return;
+            }
+
+            var name = ctx.Request.QueryString["name"];
+            if (string.IsNullOrEmpty(name))
+            {
+                ServeError(ctx, 400, "Missing name parameter");
+                return;
+            }
+
+            var safeName = SanitizeRecordingFilename(name);
+            if (string.IsNullOrEmpty(safeName))
+            {
+                ServeError(ctx, 400, "Invalid filename");
+                return;
+            }
+
+            switch (action)
+            {
+                case "append":
+                    AppendRecordingChunk(ctx, sessionId, safeName);
+                    break;
+                case "finalize":
+                    FinalizeRecordingSession(ctx, sessionId);
+                    break;
+                case "abort":
+                    AbortRecordingSession(ctx, sessionId);
+                    break;
+                default:
+                    ServeError(ctx, 404, "Unknown recording action");
+                    break;
+            }
+        }
+
+        private void AppendRecordingChunk(HttpListenerContext ctx, string sessionId, string safeName)
+        {
+            if (ctx.Request.HttpMethod != "POST")
+            {
+                ServeError(ctx, 405, "POST required");
+                return;
+            }
+
+            if (_finalizedSessions.ContainsKey(sessionId))
+            {
+                ServeError(ctx, 410, "Session closed");
+                return;
+            }
+
+            RecordingSession session;
+            try
+            {
+                session = _recordings.GetOrAdd(sessionId, id =>
+                    RecordingSession.Create(id, Path.Combine(RecordingsRoot, safeName)));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[JRTI-Stream]: Could not create session {sessionId}: {ex.Message}");
+                ServeError(ctx, 500, "Session create failed");
+                return;
+            }
+
+            if (_finalizedSessions.ContainsKey(sessionId))
+            {
+                if (_recordings.TryRemove(sessionId, out var zombie) && ReferenceEquals(zombie, session))
+                {
+                    try { zombie.DisposeAndDelete(); } catch { }
+                }
+                ServeError(ctx, 410, "Session closed");
+                return;
+            }
+
+            try
+            {
+                session.AppendFromStream(ctx.Request.InputStream);
+                ServeText(ctx, "ok", "text/plain");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[JRTI-Stream]: Append failed for {sessionId}: {ex.Message}");
+                ServeError(ctx, 500, "Append failed");
+            }
+        }
+
+        private void FinalizeRecordingSession(HttpListenerContext ctx, string sessionId)
+        {
+            _finalizedSessions.TryAdd(sessionId, 0);
+            if (_recordings.TryRemove(sessionId, out var session))
+            {
+                try
+                {
+                    session.Dispose();
+                    Debug.Log($"[JRTI-Stream]: Recording saved: {session.DisplayPath} ({session.BytesWritten} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[JRTI-Stream]: Finalize error: {ex.Message}");
+                }
+            }
+            ServeText(ctx, "ok", "text/plain");
+        }
+
+        private void AbortRecordingSession(HttpListenerContext ctx, string sessionId)
+        {
+            _finalizedSessions.TryAdd(sessionId, 0);
+            if (_recordings.TryRemove(sessionId, out var session))
+            {
+                try
+                {
+                    session.DisposeAndDelete();
+                    Debug.Log($"[JRTI-Stream]: Recording aborted: {session.DisplayPath}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[JRTI-Stream]: Abort error: {ex.Message}");
+                }
+            }
+            ServeText(ctx, "ok", "text/plain");
+        }
+
+        private static bool IsSafeId(string id)
+        {
+            if (string.IsNullOrEmpty(id) || id.Length > 128) return false;
+            foreach (var c in id)
+            {
+                if (!(char.IsLetterOrDigit(c) || c == '-' || c == '_')) return false;
+            }
+            return true;
+        }
+
+        private static string SanitizeRecordingFilename(string requested)
+        {
+            if (string.IsNullOrEmpty(requested)) return null;
+
+            var name = Path.GetFileName(requested);
+            if (string.IsNullOrEmpty(name)) return null;
+
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (Array.IndexOf(invalid, c) >= 0 || c < 32) sb.Append('_');
+                else sb.Append(c);
+            }
+
+            var result = sb.ToString();
+            if (result.Length > 200) result = result.Substring(0, 200);
+
+            var ext = Path.GetExtension(result).ToLowerInvariant();
+            if (ext != ".webm" && ext != ".mp4" && ext != ".mkv")
+            {
+                result += ".webm";
+            }
+            return result;
         }
 
         private static void ServeSnapshot(HttpListenerContext ctx, CameraStreamState state)
@@ -408,7 +682,7 @@ namespace JustReadTheInstructions
         private static void ServeText(HttpListenerContext ctx, string text, string contentType)
         {
             var bytes = Encoding.UTF8.GetBytes(text);
-            ctx.Response.ContentType = contentType + "; charset=utf-8";
+            ctx.Response.ContentType = contentType + (contentType.Contains("charset") ? "" : "; charset=utf-8");
             ctx.Response.ContentLength64 = bytes.Length;
             ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
             ctx.Response.Close();
@@ -423,9 +697,6 @@ namespace JustReadTheInstructions
         private static string EscapeJson(string s)
             => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n")
                 .Replace("\r", "\\r").Replace("\t", "\\t");
-
-        private static string EscapeHtml(string s)
-            => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;");
 
         internal sealed class LatestFrameSlot : IDisposable
         {
@@ -491,6 +762,92 @@ namespace JustReadTheInstructions
             {
                 foreach (var kv in MjpegClients)
                     kv.Value.Dispose();
+            }
+        }
+
+        internal sealed class RecordingSession : IDisposable
+        {
+            public string SessionId { get; }
+            public string DisplayPath { get; }
+            public long BytesWritten { get; private set; }
+            public DateTime LastActivityUtc { get; private set; }
+
+            private readonly FileStream _stream;
+            private readonly object _writeLock = new object();
+            private bool _disposed;
+
+            private RecordingSession(string sessionId, string path, FileStream stream)
+            {
+                SessionId = sessionId;
+                DisplayPath = path;
+                _stream = stream;
+                LastActivityUtc = DateTime.UtcNow;
+            }
+
+            public static RecordingSession Create(string sessionId, string path)
+            {
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
+                var finalPath = ResolveUniquePath(path);
+                var stream = new FileStream(finalPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 65536);
+                return new RecordingSession(sessionId, finalPath, stream);
+            }
+
+            private static string ResolveUniquePath(string requested)
+            {
+                if (!File.Exists(requested)) return requested;
+
+                var directory = Path.GetDirectoryName(requested);
+                var baseName = Path.GetFileNameWithoutExtension(requested);
+                var ext = Path.GetExtension(requested);
+
+                for (int i = 1; i < 10000; i++)
+                {
+                    var candidate = Path.Combine(directory, $"{baseName}_{i}{ext}");
+                    if (!File.Exists(candidate)) return candidate;
+                }
+
+                return Path.Combine(directory, $"{baseName}_{Guid.NewGuid():N}{ext}");
+            }
+
+            public void AppendFromStream(Stream input)
+            {
+                var buffer = new byte[16 * 1024];
+                lock (_writeLock)
+                {
+                    if (_disposed) throw new ObjectDisposedException(nameof(RecordingSession));
+                    int read;
+                    while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        _stream.Write(buffer, 0, read);
+                        BytesWritten += read;
+                    }
+                    _stream.Flush();
+                    LastActivityUtc = DateTime.UtcNow;
+                }
+            }
+
+            public void Dispose()
+            {
+                lock (_writeLock)
+                {
+                    if (_disposed) return;
+                    _disposed = true;
+                    try { _stream.Flush(); } catch { }
+                    try { _stream.Dispose(); } catch { }
+                }
+            }
+
+            public void DisposeAndDelete()
+            {
+                Dispose();
+                try
+                {
+                    if (File.Exists(DisplayPath)) File.Delete(DisplayPath);
+                }
+                catch { }
             }
         }
     }
