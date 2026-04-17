@@ -9,13 +9,20 @@ namespace JustReadTheInstructions
     {
         private static void FixMp4(string path)
         {
+            try { FixMp4Internal(path); }
+            catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: FixMp4 crash:\n{ex}"); }
+        }
+
+        private static void FixMp4Internal(string path)
+        {
             byte[] d;
             try
             {
-                if (new FileInfo(path).Length > 2L * 1024 * 1024 * 1024) return;
+                var fi = new FileInfo(path);
+                if (fi.Length > 2L * 1024 * 1024 * 1024) { Debug.LogWarning($"[JRTI-Stream]: FixMp4 skip (>2GB): {path}"); return; }
                 d = File.ReadAllBytes(path);
             }
-            catch { return; }
+            catch (Exception ex) { Debug.LogWarning($"[JRTI-Stream]: FixMp4 read failed: {ex.Message}"); return; }
 
             long movieTs = 0, trackTs = 0;
             uint trackId = 1;
@@ -50,7 +57,11 @@ namespace JustReadTheInstructions
                 i += (int)sz;
             }
 
-            if (moovEnd < 0 || movieTs == 0 || trackTs == 0) return;
+            if (moovEnd < 0 || movieTs == 0 || trackTs == 0)
+            {
+                Debug.LogWarning($"[JRTI-Stream]: FixMp4 abort — moovEnd={moovEnd}, movieTs={movieTs}, trackTs={trackTs}, frags={frags.Count}, path={path}");
+                return;
+            }
 
             if (totalDur > 0 && mvhdOff >= 0)
             {
@@ -60,7 +71,12 @@ namespace JustReadTheInstructions
                 if (mdhdOff >= 0) WriteDurMvhd(d, mdhdOff, mdhdV0, totalDur);
             }
 
-            if (frags.Count == 0) { try { File.WriteAllBytes(path, d); } catch { } return; }
+            if (frags.Count == 0)
+            {
+                Debug.LogWarning($"[JRTI-Stream]: FixMp4 abort — no moof fragments found. moovEnd={moovEnd}, movieTs={movieTs}, trackTs={trackTs}");
+                try { File.WriteAllBytes(path, d); } catch { }
+                return;
+            }
 
             byte[] sidx = BuildSidx(trackId, trackTs, frags);
             byte[] result = new byte[d.Length + sidx.Length];
@@ -68,8 +84,12 @@ namespace JustReadTheInstructions
             Buffer.BlockCopy(sidx, 0, result, moovEnd, sidx.Length);
             Buffer.BlockCopy(d, moovEnd, result, moovEnd + sidx.Length, d.Length - moovEnd);
 
-            try { File.WriteAllBytes(path, result); }
-            catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: FixMp4 failed: {ex.Message}"); }
+            try
+            {
+                File.WriteAllBytes(path, result);
+                Debug.Log($"[JRTI-Stream]: FixMp4 OK — {frags.Count} frags, SIDX {sidx.Length}B injected at offset {moovEnd}: {path}");
+            }
+            catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: FixMp4 write failed: {ex.Message}"); }
         }
 
         private static void ScanMoov(byte[] d, int s, int e,
@@ -254,7 +274,7 @@ namespace JustReadTheInstructions
         private static byte[] BuildSidx(uint trackId, long timescale,
             List<(long size, long dur, bool rap)> frags)
         {
-            int total = 28 + frags.Count * 12;
+            int total = 32 + frags.Count * 12;
             var b = new byte[total];
             int o = 0;
 

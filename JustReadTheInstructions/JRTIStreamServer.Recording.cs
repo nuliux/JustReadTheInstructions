@@ -108,7 +108,7 @@ namespace JustReadTheInstructions
                         FixMp4(session.DisplayPath);
                     Debug.Log($"[JRTI-Stream]: Recording saved: {session.DisplayPath} ({session.BytesWritten} bytes)");
                 }
-                catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: Finalize error: {ex.Message}"); }
+                catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: Finalize error:\n{ex}"); }
             }
             ServeText(ctx, "ok", "text/plain");
         }

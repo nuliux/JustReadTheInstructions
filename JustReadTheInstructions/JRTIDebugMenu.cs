@@ -249,6 +249,7 @@ namespace JustReadTheInstructions
             HullCameraManager.Instance?.UpdateAllCameraVisualEffects();
         }
 
+        // TODO : Check why sometimes, this doesn't output the diagnostics info to the log.
         private void PrintDiagnostics()
         {
             Debug.Log("[JRTI-Debug]: ===== Visual Mod Integration Diagnostics =====");
