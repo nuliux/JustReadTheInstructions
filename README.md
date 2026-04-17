@@ -38,7 +38,7 @@
 
 * View **Hullcam VDS** camera feeds in a web browser
 * Externalize in-game camera views outside the main game window
-* Record camera feeds from the web UI (locally on the KSP host, or Save-As on remote clients) (!! experimental !!)
+* Record camera feeds from the web UI (locally on the KSP host, or Save-As on remote clients)
 * Grab the raw MJPEG feed URL for OBS or other external tools
 
 ## Screenshot
