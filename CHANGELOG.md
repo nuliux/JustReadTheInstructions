@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Custom LOS screen (png `customlos.png`)
+- Stream all button on in-game Flight UI
+- Settings button on in-game Flight UI
+
+### Fixed
+- Proper session cleanup between flights to avoid dead cameras to persist between launches
+
 
 ## [v2.0.0-beta.4] Web UI Recording (Beta 4) - 2026-04-17
 
