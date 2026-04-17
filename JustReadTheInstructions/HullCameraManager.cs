@@ -49,8 +49,11 @@ namespace JustReadTheInstructions
 
         private void UpdateAllRenderers()
         {
-            foreach (var renderer in _renderers.Values)
-                renderer.Update();
+            foreach (var kvp in _renderers)
+            {
+                bool hasWindow = _windows.ContainsKey(kvp.Key);
+                kvp.Value.Update(hasWindow);
+            }
         }
 
         private void UpdateAllWindows()

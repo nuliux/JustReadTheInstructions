@@ -25,7 +25,6 @@ namespace JustReadTheInstructions
         private bool _parallaxApplied;
         private bool _fireflyApplied;
         private bool _scattererApplied;
-        private RenderTexture _filteredTexture;
 
         public HullCameraRenderer(MuMechModuleHullCamera hullCamera)
         {
@@ -218,13 +217,13 @@ namespace JustReadTheInstructions
             return null;
         }
 
-        public void Update()
+        public void Update(bool hasInGameViewer = false)
         {
             if (!IsActive || _hullCamera == null) return;
 
             _frameCount++;
 
-            bool hasViewers = JRTIStreamServer.Instance?.HasActiveClients(InstanceId) ?? false;
+            bool hasViewers = hasInGameViewer || (JRTIStreamServer.Instance?.HasActiveClients(InstanceId) ?? false);
             bool shouldRender = hasViewers && (_frameCount % (JRTISettings.RenderEveryOtherFrame ? 2 : 1)) == 0;
             SetCamerasEnabled(shouldRender);
 
@@ -232,7 +231,11 @@ namespace JustReadTheInstructions
 
             if (_parallaxApplied) RenderParallaxScatters();
             if (_fireflyApplied) UpdateFireflyEffects();
-            JRTIStreamServer.Instance?.TryCaptureFrame(InstanceId, GetCaptureTexture());
+
+            if (JRTISettings.EnableHullcamFilter && HullcamFilterIntegration.IsAvailable)
+                HullcamFilterIntegration.SyncToCamera(_cameras[NearCameraIndex], _hullCamera);
+
+            JRTIStreamServer.Instance?.TryCaptureFrame(InstanceId, TargetTexture);
         }
 
         private void RenderParallaxScatters()
@@ -253,26 +256,6 @@ namespace JustReadTheInstructions
             var nearCamera = _cameras[NearCameraIndex];
             if (nearCamera != null && nearCamera.enabled)
                 FireflyIntegration.UpdateForCamera(nearCamera, GetVessel());
-        }
-
-        private RenderTexture GetCaptureTexture()
-        {
-            if (!JRTISettings.EnableHullcamFilter)
-                return TargetTexture;
-
-            var mat = HullcamFilterIntegration.GetFilterMaterial();
-            if (mat == null)
-                return TargetTexture;
-
-            if (_filteredTexture == null || !_filteredTexture.IsCreated())
-            {
-                _filteredTexture?.Release();
-                _filteredTexture = new RenderTexture(TargetTexture.descriptor);
-                _filteredTexture.Create();
-            }
-
-            Graphics.Blit(TargetTexture, _filteredTexture, mat);
-            return _filteredTexture;
         }
 
         private void SetCamerasEnabled(bool enabled)
@@ -443,14 +426,12 @@ namespace JustReadTheInstructions
                     FireflyIntegration.RemoveFromCamera(camera);
                     FireflyIntegration.CleanupCamera(camera);
                     ScattererIntegration.RemoveFromCamera(camera);
+                    HullcamFilterIntegration.RemoveFromCamera(camera);
 
                     if (camera.gameObject != null)
                         UnityEngine.Object.Destroy(camera.gameObject);
                 }
             }
-
-            _filteredTexture?.Release();
-            _filteredTexture = null;
 
             TargetTexture?.Release();
             TargetTexture = null;
