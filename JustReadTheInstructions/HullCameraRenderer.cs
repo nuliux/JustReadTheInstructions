@@ -97,30 +97,30 @@ namespace JustReadTheInstructions
             camera.allowHDR = JRTISettings.UseHDR;
             camera.allowMSAA = !ScattererIntegration.IsAvailable;
 
-            if (JRTIDebugMenu.EnableDeferred)
+            if (JRTISettings.EnableDeferred)
                 DeferredIntegration.ApplyToCamera(camera, 15);
 
-            if (JRTIDebugMenu.EnableTUFX)
+            if (JRTISettings.EnableTUFX)
                 TUFXIntegration.ApplyToCamera(camera);
 
-            if (JRTIDebugMenu.EnableEVE)
+            if (JRTISettings.EnableEVE)
                 EVEIntegration.ApplyToCamera(camera, mainCam, includeLocalEffects: true);
 
-            if (JRTIDebugMenu.EnableParallax)
+            if (JRTISettings.EnableParallax)
                 ParallaxIntegration.ApplyToCamera(camera);
 
-            if (JRTIDebugMenu.EnableFirefly)
+            if (JRTISettings.EnableFirefly)
                 FireflyIntegration.ApplyToCamera(camera);
 
-            if (JRTIDebugMenu.EnableScatterer)
+            if (JRTISettings.EnableScatterer)
                 ScattererIntegration.ApplyToCamera(camera);
 
-            _deferredApplied = JRTIDebugMenu.EnableDeferred;
-            _tufxApplied = JRTIDebugMenu.EnableTUFX;
-            _eveApplied = JRTIDebugMenu.EnableEVE;
-            _parallaxApplied = JRTIDebugMenu.EnableParallax;
-            _fireflyApplied = JRTIDebugMenu.EnableFirefly;
-            _scattererApplied = JRTIDebugMenu.EnableScatterer;
+            _deferredApplied = JRTISettings.EnableDeferred;
+            _tufxApplied = JRTISettings.EnableTUFX;
+            _eveApplied = JRTISettings.EnableEVE;
+            _parallaxApplied = JRTISettings.EnableParallax;
+            _fireflyApplied = JRTISettings.EnableFirefly;
+            _scattererApplied = JRTISettings.EnableScatterer;
 
             camObj.AddComponent<CanvasFix>();
 
@@ -152,13 +152,13 @@ namespace JustReadTheInstructions
             camera.allowHDR = JRTISettings.UseHDR;
             camera.allowMSAA = !ScattererIntegration.IsAvailable;
 
-            if (JRTIDebugMenu.EnableDeferred)
+            if (JRTISettings.EnableDeferred)
                 DeferredIntegration.ApplyToCamera(camera, 10);
 
-            if (JRTIDebugMenu.EnableTUFX)
+            if (JRTISettings.EnableTUFX)
                 TUFXIntegration.ApplyToCamera(camera);
 
-            if (JRTIDebugMenu.EnableEVE)
+            if (JRTISettings.EnableEVE)
                 EVEIntegration.ApplyToCamera(camera, mainScaledCam, includeLocalEffects: false);
 
             var synchronizer = camObj.AddComponent<CameraSynchronizer>();
@@ -191,10 +191,10 @@ namespace JustReadTheInstructions
             camera.allowHDR = JRTISettings.UseHDR;
             camera.allowMSAA = !ScattererIntegration.IsAvailable;
 
-            if (JRTIDebugMenu.EnableDeferred)
+            if (JRTISettings.EnableDeferred)
                 DeferredIntegration.ApplyToCamera(camera, 10);
 
-            if (JRTIDebugMenu.EnableTUFX)
+            if (JRTISettings.EnableTUFX)
                 TUFXIntegration.ApplyToCamera(camera);
 
             var synchronizer = camObj.AddComponent<CameraSynchronizer>();
@@ -293,20 +293,20 @@ namespace JustReadTheInstructions
         public void UpdateVisualEffects()
         {
             UpdateIntegration(
-                JRTIDebugMenu.EnableDeferred, ref _deferredApplied,
+                JRTISettings.EnableDeferred, ref _deferredApplied,
                 cam => DeferredIntegration.ApplyToCamera(cam, cam.name.Contains("Near") ? 15 : 10),
                 cam => DeferredIntegration.RemoveFromCamera(cam),
                 "Deferred"
             );
 
             UpdateIntegration(
-                JRTIDebugMenu.EnableTUFX, ref _tufxApplied,
+                JRTISettings.EnableTUFX, ref _tufxApplied,
                 cam => TUFXIntegration.ApplyToCamera(cam),
                 cam => TUFXIntegration.RemoveFromCamera(cam),
                 "TUFX"
             );
 
-            if (JRTIDebugMenu.EnableEVE && !_eveApplied)
+            if (JRTISettings.EnableEVE && !_eveApplied)
             {
                 var mainCam = Camera.allCameras.FirstOrDefault(c => c.name == "Camera 00");
                 var scaledCam = FindCameraByName("Camera ScaledSpace");
@@ -319,7 +319,7 @@ namespace JustReadTheInstructions
                 _eveApplied = true;
                 Debug.Log($"[JRTI]: Applied EVE to {GetDisplayName()}");
             }
-            else if (!JRTIDebugMenu.EnableEVE && _eveApplied)
+            else if (!JRTISettings.EnableEVE && _eveApplied)
             {
                 foreach (var camera in _cameras)
                 {
@@ -331,13 +331,13 @@ namespace JustReadTheInstructions
             }
 
             UpdateIntegration(
-                JRTIDebugMenu.EnableParallax, ref _parallaxApplied,
+                JRTISettings.EnableParallax, ref _parallaxApplied,
                 cam => ParallaxIntegration.ApplyToCamera(cam),
                 cam => ParallaxIntegration.RemoveFromCamera(cam),
                 "Parallax"
             );
 
-            if (JRTIDebugMenu.EnableFirefly && !_fireflyApplied)
+            if (JRTISettings.EnableFirefly && !_fireflyApplied)
             {
                 var nearCamera = _cameras[NearCameraIndex];
                 if (nearCamera != null)
@@ -345,7 +345,7 @@ namespace JustReadTheInstructions
                 _fireflyApplied = true;
                 Debug.Log($"[JRTI]: Applied Firefly to {GetDisplayName()}");
             }
-            else if (!JRTIDebugMenu.EnableFirefly && _fireflyApplied)
+            else if (!JRTISettings.EnableFirefly && _fireflyApplied)
             {
                 var nearCamera = _cameras[NearCameraIndex];
                 if (nearCamera != null)
@@ -357,7 +357,7 @@ namespace JustReadTheInstructions
                 Debug.Log($"[JRTI]: Removed Firefly from {GetDisplayName()}");
             }
 
-            if (JRTIDebugMenu.EnableScatterer && !_scattererApplied)
+            if (JRTISettings.EnableScatterer && !_scattererApplied)
             {
                 var nearCamera = _cameras[NearCameraIndex];
                 if (nearCamera != null)
@@ -365,7 +365,7 @@ namespace JustReadTheInstructions
                 _scattererApplied = true;
                 Debug.Log($"[JRTI]: Applied Scatterer to {GetDisplayName()}");
             }
-            else if (!JRTIDebugMenu.EnableScatterer && _scattererApplied)
+            else if (!JRTISettings.EnableScatterer && _scattererApplied)
             {
                 var nearCamera = _cameras[NearCameraIndex];
                 if (nearCamera != null)
@@ -462,6 +462,7 @@ namespace JustReadTheInstructions
                 }
             }
 
+            info += HullcamFilterIntegration.GetDiagnosticInfo();
             return info;
         }
     }

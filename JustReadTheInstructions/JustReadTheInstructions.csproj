@@ -109,9 +109,9 @@
     <Compile Include="JRTISettingsGUI.cs" />
     <Compile Include="ParallaxIntegration.cs" />
     <Compile Include="ScattererIntegration.cs" />
+    <Compile Include="HullcamFilterIntegration.cs" />
     <Compile Include="ScattererCameraSwap.cs" />
     <Compile Include="TUFXIntegration.cs" />
-    <Compile Include="JRTIDebugMenu.cs" />
     <Compile Include="FireflyIntegration.cs" />
     <Compile Include="EVEIntegration.cs" />
     <Compile Include="DeferredIntegration.cs" />

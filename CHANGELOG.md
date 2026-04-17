@@ -8,12 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Custom LOS screen (png `customlos.png`)
-- Stream all button on in-game Flight UI
-- Settings button on in-game Flight UI
+- Unified **Settings & Integrations** menu merging the former Settings and Debug menus into a single scrollable window with four collapsible sections: Stream/Capture, Visual Mod Integrations, Diagnostics, and Troubleshooting
+- Visual mod integrations (Deferred, TUFX, Scatterer, EVE, Parallax, Firefly) are now toggleable directly from the unified menu with live ✓/✗ availability indicators
+- **HullcamVDS Camera Filter** integration — discovers the active Hullcam filter/overlay material at runtime via reflection and blits it over the stream frame; falls back silently to raw frame when unavailable or unset
+- Integration enable/disable state now persists to `settings.cfg` and is restored on launch (previously runtime-only)
+- Stream All button on in-game Flight UI — streams all available cameras in one click (shown only when more than one camera is available)
+- Settings button on in-game Flight UI — opens the unified settings menu directly from the flight toolbar window
+- Custom LOS screen support (drop `customlos.png` alongside `los.png` to override)
+- `GET /session` endpoint returning a per-launch UUID, used by the web client to detect a fresh game session
+- Troubleshooting section in the unified menu documenting when a camera or feed reload is needed, with a one-click "Reload Integrations" button
 
 ### Fixed
-- Proper session cleanup between flights to avoid dead cameras to persist between launches
+- Persisted offline/destroyed camera cards from a previous game launch are now cleared on page load when a new game session is detected — the web client compares the stored session UUID against the server's and wipes `localStorage` on mismatch
+
+### Changed
+- Integration enable flags moved from `JRTIDebugMenu` (runtime-only statics) to `JRTISettings` (persisted properties) — **Parallax still defaults to `false`**
+- `JRTIDebugMenu` removed; all functionality absorbed into the unified `JRTISettingsGUI`
+- Ctrl+Alt+F8 (former debug menu) and Ctrl+Alt+F9 (former settings) now both open the same unified menu
 
 
 ## [v2.0.0-beta.4] Web UI Recording (Beta 4) - 2026-04-17
