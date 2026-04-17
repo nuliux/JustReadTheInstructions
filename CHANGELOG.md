@@ -8,21 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Post-recording remux pass to add seek indices to WebM/MP4 files (both local & remote) for improved scrubbing/seeking support. This is currently in progress, the scrubbing isn't perfect yet. The footage itself is intact and plays end-to-end without issue.
+- Server-side SIDX (segment index) injection on MP4 finalize, enabling frame-accurate scrubbing and seeking in all recorded files without any post-processing step
 
 ### Fixed
 - Pause/Resume button on recording cards stayed visible when idle — `.btn` uses `display: inline-flex`, which overrode the HTML `hidden` attribute (whose default is `display: none`). Added a single `[hidden] { display: none !important; }` rule so the attribute works as expected everywhere it's used
 - Camera-card footer size label now reads `LAST RECORDING SIZE = X MB` instead of a bare byte count, and persists after the recording ends instead of clearing the moment the state flips to idle
-- Accidentally hardcoded WebM as mimeType instead of accepting whichever other flag was available in the candidate list, which caused recording to fail on certain occasions.
+- Accidentally hardcoded WebM as mimeType instead of accepting whichever other flag was available in the candidate list, which caused recording to fail on certain occasions
+- MP4 recordings were never seekable — `FixMp4` was silently crashing on every finalize due to a 4-byte header miscalculation in the SIDX builder (`28` → `32`), causing an `IndexOutOfRangeException` that was swallowed by the outer catch
+- Offline camera cards disappeared on page refresh — `localStorage` was overwritten with only the live camera list on each sync, immediately evicting any card that had just gone offline. Persistence now snapshots all cards after each sync loop completes
 
 ### Changed
-- `camera-card.js` refactor for readability (no behaviour change): state-dependent UI mutations now driven by a `REC_STATES` lookup table instead of a four-branch `if/else` which was ugly practice, DOM construction split across `_buildPreview` / `_buildInfo` / `_buildFooter`, and the three near-identical copy-button blocks replaced by `makeButton` / `makeCopyButton` helpers
+- `camera-card.js` refactor for readability (no behaviour change): state-dependent UI mutations now driven by a `REC_STATES` lookup table instead of a four-branch `if/else`, DOM construction split across `_buildPreview` / `_buildInfo` / `_buildFooter`, and the three near-identical copy-button blocks replaced by `makeButton` / `makeCopyButton` helpers
 - The disabled-when-unsupported record button now uses a `.btn-unsupported` CSS class instead of inline `opacity` / `pointerEvents` styles, to match the existing `.btn.watch-disabled` pattern
-- Removed WebM support due to inconsistent browser support. The list of MIME types is now just MP4 variants, which should be supported widely enough for the time being.
-- Refactored the JRTI Stream Server into different classes, to make the code more navigable.
+- Removed WebM support due to inconsistent browser support. The list of MIME types is now just MP4 variants, which should be supported widely enough for the time being
+- `JRTIStreamServer` split into partial class files by concern (`Http`, `Recording`, `Mp4`, `Types`) to reduce the size of the monolith
+- `FixMp4` is now self-contained — wrapped in its own try-catch that logs full exceptions with stack trace and never propagates to `FinalizeRecordingSession`
 
 ### Known Issues
-- Scrubbing/seeking inside recorded `.webm` / `.mp4` files is unreliable. The footage itself is intact; the `MediaRecorder` output just lacks a proper seek index. A post-finalize remux pass is planned. Playing end-to-end or re-encoding through ffmpeg works fine
 - Faint reflection/shadow artifact visible on Kerbin and the Mun through JRTI cameras when Scatterer and/or EVE are installed. Actual shadows render correctly, so this looks like a hook or reflection probe tied to the main camera's frustum bleeding into the mod camera. Under investigation
 
 ## [v2.0.0-beta.3] Web UI Recording (Beta 3) - 2026-04-17
