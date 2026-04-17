@@ -47,28 +47,6 @@ Open the Settings button on the main page to pick one of:
     Discard         Stop and delete the recording
 
 
-PLAYBACK AND SCRUBBING
------------------------
-
-Recorded files play back end-to-end just fine, but seeking (dragging the
-scrubber) can be unreliable: the duration may read wrong, the thumbnail may
-jump around, or the video may freeze for a moment.
-
-This is not a problem with the footage itself - it's a limitation of the way
-the browser's MediaRecorder writes chunks straight to disk without building a
-seek index. If you need clean scrubbing, run the file through VLC or ffmpeg
-once:
-
-    ffmpeg -i input.webm -c copy output.webm
-
-That rewrites the container metadata without re-encoding the video, and the
-resulting file seeks correctly everywhere.
-
-NOTE : This section is temporary and only relevant for the 2.0.0 beta release.
-A future update will add an option to write proper seek indexes
-directly in the browser, eliminating the need for this workaround.
-
-
 REMOTE RECORDING
 -----------------
 
