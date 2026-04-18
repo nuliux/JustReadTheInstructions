@@ -16,12 +16,21 @@ import { getSettings } from './recorder-settings.js';
 import { fixMp4 } from './fix-mp4.js';
 import { fixWebm } from './fix-webm.js';
 
-const MIME_CANDIDATES = [
-    'video/mp4;codecs=avc1',
-    'video/mp4',
-    'video/webm;codecs=vp9',
-    'video/webm',
-];
+const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
+
+const MIME_CANDIDATES = IS_FIREFOX
+    ? [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+    ]
+    : [
+        'video/mp4;codecs=avc1.42E01E',
+        'video/mp4;codecs=avc1',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+    ];
 
 function pickMimeType() {
     if (typeof MediaRecorder === 'undefined') return null;
@@ -311,8 +320,11 @@ export class CameraRecorder {
             try {
                 if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
                     await new Promise((resolve) => {
-                        this._mediaRecorder.addEventListener('stop', resolve, { once: true });
-                        try { this._mediaRecorder.stop(); } catch { resolve(); }
+                        const done = () => { clearTimeout(timer); resolve(); };
+                        const timer = setTimeout(done, 3000);
+                        this._mediaRecorder.addEventListener('stop', done, { once: true });
+                        try { this._mediaRecorder.requestData(); } catch { }
+                        try { this._mediaRecorder.stop(); } catch { done(); }
                     });
                 }
 
