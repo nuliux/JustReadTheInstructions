@@ -161,10 +161,16 @@ namespace JustReadTheInstructions
             if (JRTISettings.EnableEVE)
                 EVEIntegration.ApplyToCamera(camera, mainScaledCam, includeLocalEffects: false);
 
+            if (JRTISettings.EnableScatterer)
+                ScattererIntegration.ApplyToScaledCamera(camera);
+
             var synchronizer = camObj.AddComponent<CameraSynchronizer>();
             synchronizer.SourceCamera = _cameras[NearCameraIndex];
 
             camObj.AddComponent<CanvasFix>();
+
+            if (ScattererIntegration.IsAvailable)
+                camObj.AddComponent<ScattererScaledCameraSwap>();
 
             _cameras[ScaledCameraIndex] = camera;
         }
@@ -363,17 +369,20 @@ namespace JustReadTheInstructions
 
             if (JRTISettings.EnableScatterer && !_scattererApplied)
             {
-                var nearCamera = _cameras[NearCameraIndex];
-                if (nearCamera != null)
-                    ScattererIntegration.ApplyToCamera(nearCamera);
+                if (_cameras[NearCameraIndex] != null)
+                    ScattererIntegration.ApplyToCamera(_cameras[NearCameraIndex]);
+                if (_cameras[ScaledCameraIndex] != null)
+                    ScattererIntegration.ApplyToScaledCamera(_cameras[ScaledCameraIndex]);
                 _scattererApplied = true;
                 Debug.Log($"[JRTI]: Applied Scatterer to {GetDisplayName()}");
             }
             else if (!JRTISettings.EnableScatterer && _scattererApplied)
             {
-                var nearCamera = _cameras[NearCameraIndex];
-                if (nearCamera != null)
-                    ScattererIntegration.RemoveFromCamera(nearCamera);
+                foreach (var camera in _cameras)
+                {
+                    if (camera != null)
+                        ScattererIntegration.RemoveFromCamera(camera);
+                }
                 _scattererApplied = false;
                 Debug.Log($"[JRTI]: Removed Scatterer from {GetDisplayName()}");
             }
