@@ -19,21 +19,20 @@ namespace JustReadTheInstructions
             try
             {
                 var fi = new FileInfo(path);
-                if (fi.Length > 2L * 1024 * 1024 * 1024) { Debug.LogWarning($"[JRTI-Stream]: FixWebm skip (>2GB): {path}"); return; }
+                if (fi.Length > 2L * 1024 * 1024 * 1024) return;
                 d = File.ReadAllBytes(path);
             }
-            catch (Exception ex) { Debug.LogWarning($"[JRTI-Stream]: FixWebm read failed: {ex.Message}"); return; }
+            catch { return; }
 
             int i = 0;
 
-            if (!WbReadId(d, ref i, out uint ebmlId) || ebmlId != 0x1A45DFA3)
-            { Debug.LogWarning("[JRTI-Stream]: FixWebm: not an EBML file"); return; }
-            if (!WbReadSize(d, ref i, out long ebmlBodySize))
-            { Debug.LogWarning("[JRTI-Stream]: FixWebm: bad EBML size"); return; }
+            if (!WbReadId(d, ref i, out uint ebmlId) || ebmlId != 0x1A45DFA3) return;
+            if (!WbReadSize(d, ref i, out long ebmlBodySize)) return;
             i += (int)Math.Min(ebmlBodySize == WbUnknownSize ? 0 : ebmlBodySize, Math.Max(0, d.Length - i));
 
-            if (!WbReadId(d, ref i, out uint segId) || segId != 0x18538067)
-            { Debug.LogWarning("[JRTI-Stream]: FixWebm: no Segment element"); return; }
+            if (!WbReadId(d, ref i, out uint segId) || segId != 0x18538067) return;
+
+            int segSizeStart = i;
             if (!WbReadSize(d, ref i, out long segBodySize)) return;
 
             int segDataStart = i;
@@ -42,9 +41,13 @@ namespace JustReadTheInstructions
                 : segDataStart + (int)segBodySize;
 
             int segInfoStart = -1, segInfoEnd = -1;
-            long timecodeScale = 1000000;
-            bool hasDuration = false;
-            var clusters = new List<(int absStart, long time)>();
+            int existingDurationStart = -1, existingDurationEnd = -1;
+            int seekHeadStart = -1, seekHeadEnd = -1;
+            int cuesStart = -1, cuesEnd = -1;
+
+            bool hasValidDuration = false;
+            bool hasCues = false;
+            var clusters = new List<(int absStart, long time, int absEnd)>();
 
             int j = segDataStart;
             while (j < segDataEnd && j < d.Length)
@@ -67,20 +70,34 @@ namespace JustReadTheInstructions
                     int k = dataOff;
                     while (k < elEnd && k < d.Length)
                     {
+                        int childStart = k;
+
                         if (!WbReadId(d, ref k, out uint subId)) break;
                         if (!WbReadSize(d, ref k, out long subSize)) break;
-                        int subDataOff = k;
                         int subEnd = (subSize == WbUnknownSize || k + subSize > elEnd) ? elEnd : k + (int)subSize;
-                        if (subId == 0x2AD7B1 && subSize <= 8 && subSize > 0)
+
+                        if (subId == 0x4489)
                         {
-                            long ts = 0;
-                            for (int x = 0; x < (int)subSize; x++) ts = ts * 256 + d[k + x];
-                            timecodeScale = ts == 0 ? 1000000 : ts;
+                            existingDurationStart = childStart;
+                            existingDurationEnd = subEnd;
+
+                            double val = WbReadFloat(d, k, (int)subSize);
+                            if (val > 0) hasValidDuration = true;
                         }
-                        else if (subId == 0x4489)
-                            hasDuration = true;
+
                         k = subEnd;
                     }
+                }
+                else if (elId == 0x114D9B74)
+                {
+                    seekHeadStart = elStart;
+                    seekHeadEnd = elEnd;
+                }
+                else if (elId == 0x1C53BB6B)
+                {
+                    hasCues = true;
+                    cuesStart = elStart;
+                    cuesEnd = elEnd;
                 }
                 else if (elId == 0x1F43B675)
                 {
@@ -100,67 +117,141 @@ namespace JustReadTheInstructions
                         }
                         k = subEnd;
                     }
-                    clusters.Add((elStart, clusterTime));
+                    clusters.Add((elStart, clusterTime, elEnd));
                 }
 
                 j = elEnd;
             }
 
-            if (segInfoStart < 0 || clusters.Count == 0)
+            if (segInfoStart < 0 || clusters.Count == 0) return;
+            if (hasValidDuration && hasCues) return;
+
+            int firstClusterAbsPos = clusters[0].absStart;
+
+            long lastTime = clusters[clusters.Count - 1].time;
+            int lastClusterAbsStart = clusters[clusters.Count - 1].absStart;
+            int lastClusterAbsEnd = clusters[clusters.Count - 1].absEnd;
+
+            int ci = lastClusterAbsStart;
+
+            if (WbReadId(d, ref ci, out _) && WbReadSize(d, ref ci, out _))
             {
-                Debug.LogWarning($"[JRTI-Stream]: FixWebm abort — no SegInfo or clusters. path={path}");
-                return;
+                while (ci < lastClusterAbsEnd && ci < d.Length)
+                {
+                    if (!WbReadId(d, ref ci, out uint iR2)) break;
+                    if (!WbReadSize(d, ref ci, out long sR2)) break;
+                    int blockEnd = ci + (int)sR2;
+
+                    if (iR2 == 0xA3 || iR2 == 0xA1)
+                    {
+                        int tempCi = ci;
+                        if (WbReadVint(d, ref tempCi, out _))
+                        {
+                            if (tempCi + 1 < blockEnd)
+                            {
+                                int relTime = (d[tempCi] << 8) | d[tempCi + 1];
+                                short signedTime = (short)relTime;
+                                long absTime = clusters[clusters.Count - 1].time + signedTime;
+                                if (absTime > lastTime) lastTime = absTime;
+                            }
+                        }
+                    }
+                    ci = blockEnd;
+                }
             }
 
-            if (hasDuration)
-            {
-                Debug.Log($"[JRTI-Stream]: FixWebm: Duration already present in {path}");
-                return;
-            }
-
-            long lastClusterTime = clusters[clusters.Count - 1].time;
-            long durationTicks = lastClusterTime + 33;
+            long durationTicks = lastTime + 33;
 
             byte[] durationEl = WbBuildFloat64(0x4489, durationTicks);
 
             int infoIdLen = WbIdLen(d, segInfoStart);
             int infoSzLen = WbSizeLen(d, segInfoStart + infoIdLen);
-            byte[] oldInfoPayload = Slice(d, segInfoStart + infoIdLen + infoSzLen, segInfoEnd);
+            int infoDataStart = segInfoStart + infoIdLen + infoSzLen;
+
+            byte[] oldInfoPayload;
+            if (existingDurationStart != -1)
+            {
+                oldInfoPayload = Concat(
+                    Slice(d, infoDataStart, existingDurationStart),
+                    Slice(d, existingDurationEnd, segInfoEnd)
+                );
+            }
+            else
+            {
+                oldInfoPayload = Slice(d, infoDataStart, segInfoEnd);
+            }
+
             byte[] newInfoEl = WbBuildContainerRaw(0x1549A966, Concat(oldInfoPayload, durationEl));
 
+            int seekHeadSize = seekHeadStart != -1 ? (seekHeadEnd - seekHeadStart) : 0;
             int infoSizeDelta = newInfoEl.Length - (segInfoEnd - segInfoStart);
-            byte[] cuesElPass1 = WbBuildCues(clusters, segDataStart, 0);
-            long clusterShift = infoSizeDelta + cuesElPass1.Length;
+            int cuesBeforeClustersSize = (hasCues && cuesStart < firstClusterAbsPos) ? (cuesEnd - cuesStart) : 0;
+
+            long clusterShift = infoSizeDelta - seekHeadSize - cuesBeforeClustersSize;
             byte[] cuesEl = WbBuildCues(clusters, segDataStart, clusterShift);
-            int firstClusterAbsPos = clusters[0].absStart;
 
-            byte[] final = Concat(
-                Slice(d, 0, segInfoStart),
-                newInfoEl,
-                Slice(d, segInfoEnd, firstClusterAbsPos),
-                cuesEl,
-                Slice(d, firstClusterAbsPos, d.Length)
-            );
+            var parts = new List<byte[]>();
 
-            try
+            if (seekHeadStart != -1)
             {
-                File.WriteAllBytes(path, final);
-                Debug.Log($"[JRTI-Stream]: FixWebm OK — {clusters.Count} clusters, Duration={durationTicks} ticks injected: {path}");
+                parts.Add(Slice(d, segDataStart, seekHeadStart));
+                parts.Add(Slice(d, seekHeadEnd, segInfoStart));
             }
-            catch (Exception ex) { Debug.LogError($"[JRTI-Stream]: FixWebm write failed: {ex.Message}"); }
+            else
+            {
+                parts.Add(Slice(d, segDataStart, segInfoStart));
+            }
+
+            parts.Add(newInfoEl);
+
+            if (hasCues && cuesStart < firstClusterAbsPos)
+            {
+                parts.Add(Slice(d, segInfoEnd, cuesStart));
+                parts.Add(Slice(d, cuesEnd, firstClusterAbsPos));
+            }
+            else
+            {
+                parts.Add(Slice(d, segInfoEnd, firstClusterAbsPos));
+            }
+
+            if (hasCues && cuesStart >= firstClusterAbsPos)
+            {
+                parts.Add(Slice(d, firstClusterAbsPos, cuesStart));
+                parts.Add(Slice(d, cuesEnd, d.Length));
+            }
+            else
+            {
+                parts.Add(Slice(d, firstClusterAbsPos, d.Length));
+            }
+
+            parts.Add(cuesEl);
+
+            long totalBodySize = 0;
+            foreach (var p in parts) totalBodySize += p.Length;
+
+            byte[] newSegSizeBytes = WbEncodeVint(totalBodySize, 8);
+
+            parts.Insert(0, newSegSizeBytes);
+            parts.Insert(0, Slice(d, 0, segSizeStart));
+
+            byte[] final = Concat(parts.ToArray());
+
+            try { File.WriteAllBytes(path, final); }
+            catch { }
         }
 
         private static readonly long WbUnknownSize = unchecked((long)0x00FFFFFFFFFFFFFFL);
 
-        private static byte[] WbBuildCues(List<(int absStart, long time)> clusters, int segDataStart, long shift = 0)
+        private static byte[] WbBuildCues(List<(int absStart, long time, int absEnd)> clusters, int segDataStart, long shift = 0)
         {
             var points = new List<byte[]>();
-            foreach (var (absStart, time) in clusters)
+
+            foreach (var (absStart, time, _) in clusters)
             {
                 long clusterPos = Math.Max(0, absStart - segDataStart + shift);
                 byte[] trackPos = WbBuildContainerRaw(0xB7, Concat(
-                    WbBuildUint(0xF7, 1),
-                    WbBuildUint(0xF1, clusterPos)
+                    WbBuildUintFixed(0xF7, 1, 1),
+                    WbBuildUintFixed(0xF1, clusterPos, 8)
                 ));
                 byte[] cuePoint = WbBuildContainerRaw(0xBB, Concat(
                     WbBuildUint(0xB3, time),
@@ -187,6 +278,15 @@ namespace JustReadTheInstructions
             int byteLen = 1;
             long tmp = val;
             while (tmp > 0xFF) { byteLen++; tmp >>= 8; }
+            byte[] payload = new byte[byteLen];
+            long v = val;
+            for (int i = byteLen - 1; i >= 0; i--) { payload[i] = (byte)(v & 0xFF); v >>= 8; }
+            return Concat(WbEncodeId(id), WbEncodeVint(byteLen, 1), payload);
+        }
+
+        private static byte[] WbBuildUintFixed(uint id, long val, int byteLen)
+        {
+            if (val < 0) val = 0;
             byte[] payload = new byte[byteLen];
             long v = val;
             for (int i = byteLen - 1; i >= 0; i--) { payload[i] = (byte)(v & 0xFF); v >>= 8; }
@@ -277,6 +377,34 @@ namespace JustReadTheInstructions
             byte mask = 0x80;
             while ((b & mask) == 0 && width <= 8) { width++; mask >>= 1; }
             return width;
+        }
+
+        private static bool WbReadVint(byte[] d, ref int i, out long val)
+        {
+            val = 0;
+            if (i >= d.Length) return false;
+            byte b = d[i];
+            if (b == 0) return false;
+            int width = 1;
+            byte mask = 0x80;
+            while ((b & mask) == 0 && width <= 8) { width++; mask >>= 1; }
+            if (width > 8 || i + width > d.Length) return false;
+            val = b & (mask - 1);
+            for (int x = 1; x < width; x++) val = (val << 8) | d[i + x];
+            i += width;
+            return true;
+        }
+
+        private static double WbReadFloat(byte[] d, int i, int size)
+        {
+            if (size != 4 && size != 8) return 0;
+            byte[] temp = new byte[size];
+            Buffer.BlockCopy(d, i, temp, 0, size);
+
+            if (BitConverter.IsLittleEndian) Array.Reverse(temp);
+
+            if (size == 4) return BitConverter.ToSingle(temp, 0);
+            return BitConverter.ToDouble(temp, 0);
         }
 
         private static byte[] Slice(byte[] d, int start, int end)

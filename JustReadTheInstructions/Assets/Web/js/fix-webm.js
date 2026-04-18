@@ -16,26 +16,30 @@ const EBML = {
     CUE_TRACK: 0xF7,
     CUE_CLUSTER_POS: 0xF1,
     VOID: 0xEC,
+    SEEK_HEAD: 0x114D9B74,
 };
 
 function readVint(d, offset) {
+    if (offset >= d.length) return null;
     const b = d[offset];
     if (b === 0) return null;
     let width = 1;
     let mask = 0x80;
     while (!(b & mask) && width <= 8) { width++; mask >>= 1; }
-    if (width > 8) return null;
+    if (width > 8 || offset + width > d.length) return null;
     let val = b & (mask - 1);
     for (let i = 1; i < width; i++) val = (val * 256) + d[offset + i];
     return { val, len: width };
 }
 
 function readId(d, offset) {
+    if (offset >= d.length) return null;
     const b = d[offset];
     if (b === 0) return null;
     let width = 1;
     let mask = 0x80;
     while (!(b & mask) && width <= 4) { width++; mask >>= 1; }
+    if (offset + width > d.length) return null;
     let id = b;
     for (let i = 1; i < width; i++) id = (id * 256) + d[offset + i];
     return { id, len: width };
@@ -54,7 +58,11 @@ function writeVintFixed(val, width) {
     return b;
 }
 
-function writeUint(val, byteLen) {
+function writeUint(val) {
+    if (val <= 0) return new Uint8Array([0]);
+    let byteLen = 1;
+    let tmp = val;
+    while (tmp > 255) { byteLen++; tmp = Math.floor(tmp / 256); }
     const b = new Uint8Array(byteLen);
     let v = val;
     for (let i = byteLen - 1; i >= 0; i--) { b[i] = v & 0xFF; v = Math.floor(v / 256); }
@@ -104,10 +112,11 @@ function scanSegment(d, segStart, segDataStart, segDataEnd) {
     const clusters = [];
     let segInfoStart = -1, segInfoEnd = -1;
     let cuesStart = -1, cuesEnd = -1;
+    let seekHeadStart = -1, seekHeadEnd = -1;
     let timecodeScale = 1000000;
 
     let i = segDataStart;
-    while (i < segDataEnd) {
+    while (i < segDataEnd && i < d.length) {
         const idR = readId(d, i);
         if (!idR) break;
         const szR = readSize(d, i + idR.len);
@@ -119,9 +128,9 @@ function scanSegment(d, segStart, segDataStart, segDataEnd) {
 
         if (idR.id === EBML.SEG_INFO) {
             segInfoStart = eStart;
-            segInfoEnd = eEnd;
+            segInfoEnd = Math.min(eEnd, d.length);
             let j = dataStart;
-            while (j < eEnd) {
+            while (j < segInfoEnd) {
                 const iR2 = readId(d, j);
                 if (!iR2) break;
                 const sR2 = readSize(d, j + iR2.len);
@@ -136,7 +145,7 @@ function scanSegment(d, segStart, segDataStart, segDataEnd) {
         } else if (idR.id === EBML.CLUSTER) {
             let clusterTime = 0;
             let j = dataStart;
-            while (j < eEnd) {
+            while (j < eEnd && j < d.length) {
                 const iR2 = readId(d, j);
                 if (!iR2) break;
                 const sR2 = readSize(d, j + iR2.len);
@@ -149,27 +158,30 @@ function scanSegment(d, segStart, segDataStart, segDataEnd) {
                 }
                 j += iR2.len + sR2.len + sR2.val;
             }
-            clusters.push({ pos: eStart - segDataStart, time: clusterTime, end: eEnd });
+            clusters.push({ pos: eStart - segDataStart, time: clusterTime, end: Math.min(eEnd, d.length) });
         } else if (idR.id === EBML.CUES) {
             cuesStart = eStart;
-            cuesEnd = eEnd;
+            cuesEnd = Math.min(eEnd, d.length);
+        } else if (idR.id === EBML.SEEK_HEAD) {
+            seekHeadStart = eStart;
+            seekHeadEnd = Math.min(eEnd, d.length);
         }
 
         i = eEnd;
     }
 
-    return { clusters, segInfoStart, segInfoEnd, cuesStart, cuesEnd, timecodeScale };
+    return { clusters, segInfoStart, segInfoEnd, cuesStart, cuesEnd, timecodeScale, seekHeadStart, seekHeadEnd };
 }
 
 function buildCues(clusters, clusterShift) {
     const cuePoints = clusters.map(c => {
         const pos = Math.max(0, c.pos + clusterShift);
         const trackPos = concat(
-            buildElement(EBML.CUE_TRACK, writeUint(1, 1)),
-            buildElement(EBML.CUE_CLUSTER_POS, writeUint(pos, 8))
+            buildElement(EBML.CUE_TRACK, writeUint(1)),
+            buildElement(EBML.CUE_CLUSTER_POS, writeUint(pos))
         );
         return buildElement(EBML.CUE_POINT, concat(
-            buildElement(EBML.CUE_TIME, writeUint(c.time, Math.max(1, vintWidth(c.time)))),
+            buildElement(EBML.CUE_TIME, writeUint(c.time)),
             buildElement(EBML.CUE_TRACK_POSITIONS, trackPos)
         ));
     });
@@ -183,25 +195,45 @@ function patchSegInfo(d, segInfoStart, segInfoEnd, duration) {
     const szR = readSize(d, segInfoStart + idR.len);
     const dataStart = segInfoStart + idR.len + szR.len;
 
-    let hasDuration = false;
+    let existingDurationStart = -1;
+    let existingDurationEnd = -1;
+
     let j = dataStart;
     while (j < segInfoEnd) {
+        const childStart = j;
         const iR2 = readId(d, j);
         if (!iR2) break;
         const sR2 = readSize(d, j + iR2.len);
         if (!sR2) break;
-        if (iR2.id === EBML.DURATION) { hasDuration = true; break; }
+
+        if (iR2.id === EBML.DURATION) {
+            existingDurationStart = childStart;
+            existingDurationEnd = j + iR2.len + sR2.len + sR2.val;
+            break;
+        }
         j += iR2.len + sR2.len + sR2.val;
     }
 
-    if (hasDuration) return null;
+    let oldPayload;
+    if (existingDurationStart !== -1) {
+        oldPayload = concat(
+            d.subarray(dataStart, existingDurationStart),
+            d.subarray(existingDurationEnd, segInfoEnd)
+        );
+    } else {
+        oldPayload = d.subarray(dataStart, segInfoEnd);
+    }
 
-    const oldPayload = d.subarray(dataStart, segInfoEnd);
     const newPayload = concat(oldPayload, durationEl);
     return buildElement(EBML.SEG_INFO, newPayload);
 }
 
 export async function fixWebm(blob) {
+    if (blob.size > 2 * 1024 * 1024 * 1024) {
+        console.warn("File is too large to process in browser memory.");
+        return blob;
+    }
+
     const buf = await blob.arrayBuffer();
     const d = new Uint8Array(buf);
 
@@ -215,63 +247,100 @@ export async function fixWebm(blob) {
     i = ebmlEnd;
     const segIdR = readId(d, i);
     if (!segIdR || segIdR.id !== EBML.SEGMENT) return blob;
-    const segSzR = readSize(d, i + segIdR.len);
+
+    const segSizeStart = i + segIdR.len;
+    const segSzR = readSize(d, segSizeStart);
     if (!segSzR) return blob;
 
-    const segDataStart = i + segIdR.len + segSzR.len;
-    const segDataEnd = segSzR.val === 0x00FFFFFFFFFFFFFF
-        ? d.length
-        : segDataStart + segSzR.val;
+    const segDataStart = segSizeStart + segSzR.len;
 
-    const { clusters, segInfoStart, segInfoEnd, cuesStart, cuesEnd, timecodeScale } = scanSegment(d, i, segDataStart, segDataEnd);
+    let isUnknownSize = false;
+    if (segSzR.len === 8) {
+        let allFF = true;
+        for (let k = 1; k < 8; k++) {
+            if (d[segSizeStart + k] !== 0xFF) allFF = false;
+        }
+        isUnknownSize = allFF;
+    }
+
+    const segDataEnd = isUnknownSize ? d.length : segDataStart + segSzR.val;
+
+    const { clusters, segInfoStart, segInfoEnd, cuesStart, cuesEnd, seekHeadStart, seekHeadEnd } = scanSegment(d, i, segDataStart, segDataEnd);
 
     if (clusters.length === 0 || segInfoStart < 0) return blob;
 
     let lastTime = clusters[clusters.length - 1].time;
-    for (let ci = clusters[clusters.length - 1].pos + segDataStart; ci < Math.min(clusters[clusters.length - 1].end, d.length);) {
-        const iR2 = readId(d, ci);
-        if (!iR2) break;
-        const sR2 = readSize(d, ci + iR2.len);
-        if (!sR2) break;
-        if (iR2.id === EBML.SIMPLE_BLOCK || iR2.id === EBML.BLOCK) {
-            const vtR = readVint(d, ci + iR2.len + sR2.len);
-            if (vtR) {
-                const relTime = (d[ci + iR2.len + sR2.len + vtR.len] << 8) | d[ci + iR2.len + sR2.len + vtR.len + 1];
-                const signedTime = relTime >= 32768 ? relTime - 65536 : relTime;
-                const absTime = clusters[clusters.length - 1].time + signedTime;
-                if (absTime > lastTime) lastTime = absTime;
+    let ci = clusters[clusters.length - 1].pos + segDataStart;
+
+    const cidR = readId(d, ci);
+    if (cidR) {
+        const cszR = readSize(d, ci + cidR.len);
+        if (cszR) {
+            ci += cidR.len + cszR.len;
+
+            while (ci < Math.min(clusters[clusters.length - 1].end, d.length)) {
+                const iR2 = readId(d, ci);
+                if (!iR2) break;
+                const sR2 = readSize(d, ci + iR2.len);
+                if (!sR2) break;
+
+                if (iR2.id === EBML.SIMPLE_BLOCK || iR2.id === EBML.BLOCK) {
+                    const vtR = readVint(d, ci + iR2.len + sR2.len);
+                    if (vtR) {
+                        const relTime = (d[ci + iR2.len + sR2.len + vtR.len] << 8) | d[ci + iR2.len + sR2.len + vtR.len + 1];
+                        const signedTime = relTime >= 32768 ? relTime - 65536 : relTime;
+                        const absTime = clusters[clusters.length - 1].time + signedTime;
+                        if (absTime > lastTime) lastTime = absTime;
+                    }
+                }
+                ci += iR2.len + sR2.len + sR2.val;
             }
         }
-        ci += iR2.len + sR2.len + sR2.val;
     }
 
     const durationTick = lastTime + 33;
     const newInfoEl = patchSegInfo(d, segInfoStart, segInfoEnd, durationTick);
 
     const hasCues = cuesStart >= 0;
+    const clusterAbsStart = segDataStart + clusters[0].pos;
 
-    if (!newInfoEl && hasCues) return blob;
+    const seekHeadSize = seekHeadStart !== -1 ? (seekHeadEnd - seekHeadStart) : 0;
+    const infoSizeDiff = newInfoEl ? newInfoEl.length - (segInfoEnd - segInfoStart) : 0;
+    let cuesBeforeClustersSize = (hasCues && cuesStart < clusterAbsStart) ? (cuesEnd - cuesStart) : 0;
 
-    const infoSizeDelta = newInfoEl ? newInfoEl.length - (segInfoEnd - segInfoStart) : 0;
-    const tempCues = buildCues(clusters, 0);
-    const clusterShift = hasCues
-        ? infoSizeDelta + (tempCues.length - (cuesEnd - cuesStart))
-        : infoSizeDelta + tempCues.length;
+    const clusterShift = infoSizeDiff - seekHeadSize - cuesBeforeClustersSize;
     const cuesEl = buildCues(clusters, clusterShift);
 
-    const parts = [];
-    parts.push(d.subarray(0, segInfoStart));
-    parts.push(newInfoEl || d.subarray(segInfoStart, segInfoEnd));
-    if (hasCues) {
-        parts.push(d.subarray(segInfoEnd, cuesStart));
-        parts.push(cuesEl);
-        parts.push(d.subarray(cuesEnd));
+    const payloadParts = [];
+
+    if (seekHeadStart !== -1) {
+        payloadParts.push(d.subarray(segDataStart, seekHeadStart));
+        payloadParts.push(d.subarray(seekHeadEnd, segInfoStart));
     } else {
-        parts.push(d.subarray(segInfoEnd, segDataStart + clusters[0].pos));
-        parts.push(cuesEl);
-        parts.push(d.subarray(segDataStart + clusters[0].pos));
+        payloadParts.push(d.subarray(segDataStart, segInfoStart));
     }
 
-    const result = concat(...parts);
+    payloadParts.push(newInfoEl || d.subarray(segInfoStart, segInfoEnd));
+
+    if (hasCues && cuesStart < clusterAbsStart) {
+        payloadParts.push(d.subarray(segInfoEnd, cuesStart));
+        payloadParts.push(d.subarray(cuesEnd, clusterAbsStart));
+    } else {
+        payloadParts.push(d.subarray(segInfoEnd, clusterAbsStart));
+    }
+
+    if (hasCues && cuesStart >= clusterAbsStart) {
+        payloadParts.push(d.subarray(clusterAbsStart, cuesStart));
+        payloadParts.push(d.subarray(cuesEnd));
+    } else {
+        payloadParts.push(d.subarray(clusterAbsStart));
+    }
+
+    payloadParts.push(cuesEl);
+
+    const totalPayloadSize = payloadParts.reduce((s, a) => s + a.length, 0);
+    const newSegSizeBytes = writeVintFixed(totalPayloadSize, 8);
+
+    const result = concat(d.subarray(0, segSizeStart), newSegSizeBytes, ...payloadParts);
     return new Blob([result], { type: blob.type });
 }
