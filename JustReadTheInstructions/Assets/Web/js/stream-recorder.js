@@ -318,6 +318,8 @@ export class CameraRecorder {
         if (this.state === 'finalizing' || this.state === 'idle') return this._finalizePromise;
         this._setState('finalizing');
 
+        this._stopCanvasPump();
+
         const sessionId = this._sessionId;
         const filename = this._filename;
 
