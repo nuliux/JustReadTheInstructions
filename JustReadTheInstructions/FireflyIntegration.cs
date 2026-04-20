@@ -213,20 +213,9 @@ namespace JustReadTheInstructions
             bool hasBuffers = _appliedBuffers.ContainsKey(camera);
 
             if (shouldHaveEffects && !hasBuffers)
-            {
                 ApplyToCamera(camera);
-            }
-            else if (shouldHaveEffects && hasBuffers)
-            {
-                var current = _appliedBuffers[camera];
-                bool stale = current.Any(pair => pair.buf == null || !camera.GetCommandBuffers(pair.evt).Contains(pair.buf));
-                if (stale)
-                    ApplyToCamera(camera);
-            }
             else if (!shouldHaveEffects && hasBuffers)
-            {
                 RemoveFromCamera(camera);
-            }
         }
 
         public static void CleanupCamera(Camera camera)
