@@ -93,7 +93,6 @@ A few known issues are tracked but not yet fixed:
 * **Stale zero-byte buffer files** are sometimes left in the recordings folder after a session ends. They are safe to delete manually.
 * **macOS is not properly supported.** A GPU async API used internally by this Unity version is unavailable on macOS, a legacy quirk inherited from KSP's Unity build. A fix is being investigated.
 * **Performance degradation with Parallax.** Parallax integration is disabled by default. Enabling it in the Settings menu may cause significant frame-rate drops.
-* **Odd reflection/shadow artifact on planets.** With Scatterer and/or EVE installed, looking at Kerbin or the Mun through a JRTI camera can show a secondary reflection or shadow not present on the main camera. Appears to be a probe or hook tied to the main camera's frustum bleeding into the mod camera. Under investigation.
 
 If you hit something not listed here, please open an issue with your log file attached. Prefixing the title with `Bug:` helps with triage.
 
@@ -120,7 +119,7 @@ Create a `JustReadTheInstructions.csproj.user` file next to the `.csproj` and po
 </Project>
 ```
 
-**Linux / macOS:**
+**Linux / macOS (native KSP):**
 
 ```xml
 <Project>
@@ -131,6 +130,13 @@ Create a `JustReadTheInstructions.csproj.user` file next to the `.csproj` and po
 ```
 
 > `*.csproj.user` is gitignored and will never be committed.
+
+> [!NOTE]
+> **Running KSP through Proton on Linux?** KSPBuildTools expects a `KSP_Data` folder but the Windows/Proton build ships `KSP_x64_Data` instead. Create a symlink to fix this:
+> ```bash
+> ln -s "/path/to/Kerbal Space Program/KSP_x64_Data" "/path/to/Kerbal Space Program/KSP_Data"
+> ```
+> Replace `/path/to/Kerbal Space Program` with your actual Steam install path, e.g. `/home/you/.local/share/Steam/steamapps/common/Kerbal Space Program`.
 
 ### Building
 
