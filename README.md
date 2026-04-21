@@ -24,6 +24,9 @@
 > **JRTI is a tech demo as much as it is a mod - an experiment to see how far KSP can be pushed.**
 >
 > The mod is stable and usable, but expect a few unpolished edges. You may still encounter bugs, performance issues, or missing features. If you do, please report them in the Issues tab with your log file attached. Prefixing the title with `Bug:` helps with triage.
+
+---
+
 >[!WARNING]
 > Mac OS has limited compatibility, the mod may not function properly. This is still being looked into.
 
