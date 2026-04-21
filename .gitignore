@@ -375,3 +375,4 @@ Dependencies/
 *.KSPPath.props.vs/
 .vs/
 KSPPath.props
+GameData/JustReadTheInstructions/Plugins/

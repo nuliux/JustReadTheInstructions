@@ -24,7 +24,6 @@
 > **JRTI is a tech demo as much as it is a mod - an experiment to see how far KSP can be pushed.**
 >
 > The mod is stable and usable, but expect a few unpolished edges. You may still encounter bugs, performance issues, or missing features. If you do, please report them in the Issues tab with your log file attached. Prefixing the title with `Bug:` helps with triage.
-
 >[!WARNING]
 > Mac OS has limited compatibility, the mod may not function properly. This is still being looked into.
 
@@ -69,11 +68,13 @@ Kerbal Space Program/
 The **Loss of Signal** image shown in the web UI when a camera feed is unavailable can be customized with any PNG of your choice (recommended: `1920×1080`).
 
 Add this file:
+
 ```text
 GameData/JustReadTheInstructions/Web/images/customlos.png
 ```
 
 If `customlos.png` is not present, JRTI automatically falls back to the built-in:
+
 ```text
 GameData/JustReadTheInstructions/Web/images/los.png
 ```
@@ -97,50 +98,48 @@ If you hit something not listed here, please open an issue with your log file at
 
 ### Prerequisites
 
-* Visual Studio 2022, or MSBuild 17+
+* Visual Studio 2022 (Windows), or the .NET SDK with your editor of choice
 * Kerbal Space Program `1.12.x`
-* [HullcamVDS-Continued](https://github.com/linuxgurugamer/HullcamVDSContinued) installed in your KSP `GameData`
+
+HullcamVDS is declared as a dependency in the project and will be installed automatically via CKAN when you restore packages. If you already have HullcamVDS in your KSP `GameData`, it will be picked up from there without CKAN.
 
 ### Setup
 
-1. Clone the repository
-2. Copy `KSPPath.props.example` to `KSPPath.props` at the repository root
-3. Set `<KSPPath>` to your KSP install directory
-4. If HullcamVDS is at a non-standard path, also override `<HullcamVDSPath>`
+Create a `JustReadTheInstructions.csproj.user` file next to the `.csproj` and point it at your KSP install:
+
+**Windows:**
 
 ```xml
-<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project>
   <PropertyGroup>
-    <KSPPath>C:\Your\KSP\Install</KSPPath>
-    <!-- Optional: only if HullcamVDS isn't at GameData\HullCameraVDS\Plugins\ -->
-    <!-- <HullcamVDSPath>C:\Your\KSP\Install\GameData\HullCameraVDS\Plugins\HullcamVDSContinued.dll</HullcamVDSPath> -->
+    <KSPBT_GameRoot>C:\Your\KSP\Install</KSPBT_GameRoot>
   </PropertyGroup>
 </Project>
 ```
 
-> `KSPPath.props` is gitignored and will never be committed.
+**Linux / macOS:**
+
+```xml
+<Project>
+  <PropertyGroup>
+    <KSPBT_GameRoot>/home/you/KSP</KSPBT_GameRoot>
+  </PropertyGroup>
+</Project>
+```
+
+> `*.csproj.user` is gitignored and will never be committed.
 
 ### Building
 
-Open `JustReadTheInstructions.sln` in Visual Studio and build normally, or run:
-
-```powershell
-msbuild JustReadTheInstructions.sln /p:Configuration=Release
-```
-
-**On Linux**, install `mono-msbuild` and use:
-
 ```bash
-msbuild JustReadTheInstructions.sln /p:Configuration=Release
+dotnet build -c Release
 ```
 
-The built mod will be output to:
+The compiled DLL is written directly to `GameData/JustReadTheInstructions/Plugins/`.
 
-```text
-JustReadTheInstructions\Distribution\GameData\JustReadTheInstructions\
-```
+> Using `Debug` instead of `Release` will also copy a bunch of Unity and system DLLs into that folder — they're harmless since KSP ignores them, but Release keeps it clean.
 
-Copy the produced `JustReadTheInstructions` folder into your KSP `GameData` to install the development build.
+To install, symlink or copy `GameData/JustReadTheInstructions/` into your KSP `GameData/`.
 
 ## License
 

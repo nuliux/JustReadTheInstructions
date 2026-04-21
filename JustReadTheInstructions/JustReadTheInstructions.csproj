@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 	<Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-	<Import Project="$(SolutionDir)KSPPath.props" Condition="Exists('$(SolutionDir)KSPPath.props')" />
-	<Import Project="..\KSPPath.props" Condition="!Exists('$(SolutionDir)KSPPath.props') And Exists('..\KSPPath.props')" />
+
 	<PropertyGroup>
 		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
 		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -16,7 +15,10 @@
 		<TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
 		<FileAlignment>512</FileAlignment>
 		<Deterministic>true</Deterministic>
+		<KSPBT_ModRoot>$(MSBuildThisFileDirectory)../GameData/JustReadTheInstructions</KSPBT_ModRoot>
+		<KSPBT_ModPluginFolder>Plugins</KSPBT_ModPluginFolder>
 	</PropertyGroup>
+
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
 		<DebugSymbols>true</DebugSymbols>
 		<DebugType>full</DebugType>
@@ -26,6 +28,7 @@
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>4</WarningLevel>
 	</PropertyGroup>
+
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
 		<DebugType>pdbonly</DebugType>
 		<Optimize>true</Optimize>
@@ -34,71 +37,22 @@
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>4</WarningLevel>
 	</PropertyGroup>
+
 	<PropertyGroup>
 		<SignAssembly>false</SignAssembly>
 	</PropertyGroup>
+
 	<ItemGroup>
-		<Reference Include="Assembly-CSharp">
-			<HintPath>$(KSPManagedPath)/Assembly-CSharp.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="Assembly-CSharp-firstpass">
-			<HintPath>$(KSPManagedPath)/Assembly-CSharp-firstpass.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="HullcamVDSContinued">
-			<HintPath>$(HullcamVDSPath)</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="KSPAssets">
-			<HintPath>$(KSPManagedPath)/KSPAssets.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="System" />
-		<Reference Include="System.Core" />
-		<Reference Include="System.Xml.Linq" />
-		<Reference Include="System.Data.DataSetExtensions" />
-		<Reference Include="Microsoft.CSharp" />
-		<Reference Include="System.Data" />
-		<Reference Include="System.Net.Http" />
-		<Reference Include="System.Xml" />
-		<Reference Include="UnityEngine">
-			<HintPath>$(KSPManagedPath)/UnityEngine.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.AnimationModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.AnimationModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.CoreModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.CoreModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.ImageConversionModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.IMGUIModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.InputLegacyModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.TextRenderingModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.TextRenderingModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.UI">
-			<HintPath>$(KSPManagedPath)/UnityEngine.UI.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="UnityEngine.UIModule">
-			<HintPath>$(KSPManagedPath)/UnityEngine.UIModule.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
+		<PackageReference Include="KSPBuildTools" Version="1.1.1" />
 	</ItemGroup>
+
+	<ItemGroup>
+		<ModReference Include="HullcamVDSContinued">
+			<DLLPath>GameData/HullCameraVDS/Plugins/HullcamVDSContinued.dll</DLLPath>
+			<CKANIdentifier>HullCameraVDS</CKANIdentifier>
+		</ModReference>
+	</ItemGroup>
+
 	<ItemGroup>
 		<Compile Include="CameraSynchronizer.cs" />
 		<Compile Include="CameraTelemetry.cs" />
@@ -127,60 +81,6 @@
 		<Compile Include="JustReadTheInstructions.cs" />
 		<Compile Include="Properties/AssemblyInfo.cs" />
 	</ItemGroup>
-	<ItemGroup />
+
 	<Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-	<Target Name="CleanDistribution" BeforeTargets="Build">
-		<RemoveDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Plugins/" />
-		<RemoveDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Textures/" />
-		<RemoveDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Web/" />
-		<MakeDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Plugins/" />
-		<MakeDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Textures/" />
-		<MakeDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Web/" />
-	</Target>
-	<Target Name="CopyToDistribution" AfterTargets="Build">
-		<Copy SourceFiles="$(TargetDir)$(TargetFileName)" DestinationFolder="$(ProjectDir)Distribution/GameData/$(TargetName)/Plugins/" />
-		<Copy SourceFiles="$(TargetDir)$(TargetName).pdb"
-		  DestinationFolder="$(ProjectDir)Distribution/GameData/$(TargetName)/Plugins/"
-		  Condition="'$(Configuration)' == 'Debug'" />
-
-		<Copy SourceFiles="$(ProjectDir)Assets/Textures/icon.png"
-			  DestinationFolder="$(ProjectDir)Distribution/GameData/$(TargetName)/Textures/"
-			  Condition="Exists('$(ProjectDir)Assets/Textures/icon.png')" />
-
-		<Warning Text="Missing icon file: $(ProjectDir)Assets/Textures/icon.png"
-				 Condition="!Exists('$(ProjectDir)Assets/Textures/icon.png')" />
-
-		<ItemGroup>
-			<WebFiles Include="$(ProjectDir)Assets/Web/**/*" />
-		</ItemGroup>
-
-		<Error Text="Missing web folder: $(ProjectDir)Assets/Web/"
-			   Condition="!Exists('$(ProjectDir)Assets/Web/')" />
-
-		<Copy SourceFiles="@(WebFiles)"
-			  DestinationFiles="@(WebFiles->'$(ProjectDir)Distribution/GameData/$(TargetName)/Web/%(RecursiveDir)%(Filename)%(Extension)')" />
-
-		<Error Text="index.html missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/index.html')" />
-		<Error Text="viewer.html missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/viewer.html')" />
-		<Error Text="css/styles.css missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/css/styles.css')" />
-		<Error Text="js/main.js missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/js/main.js')" />
-		<Error Text="js/viewer.js missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/js/viewer.js')" />
-		<Error Text="images/los.png missing after copy"
-			   Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/images/los.png')" />
-
-		<MakeDir Directories="$(ProjectDir)Distribution/GameData/$(TargetName)/Web/recordings/"
-				 Condition="!Exists('$(ProjectDir)Distribution/GameData/$(TargetName)/Web/recordings/')" />
-
-		<Copy SourceFiles="$(ProjectDir)Assets/settings.cfg"
-			  DestinationFolder="$(ProjectDir)Distribution/GameData/$(TargetName)/"
-			  Condition="Exists('$(ProjectDir)Assets/settings.cfg')" />
-
-		<Warning Text="Missing settings file: $(ProjectDir)Assets/settings.cfg"
-				 Condition="!Exists('$(ProjectDir)Assets/settings.cfg')" />
-	</Target>
 </Project>

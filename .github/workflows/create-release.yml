@@ -1,0 +1,20 @@
+name: create-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. v2.0.1)'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    permissions:
+      contents: write
+    uses: KSPModdingLibs/KSPBuildTools/.github/workflows/create-release.yml@1.1.1
+    with:
+      version-string: ${{ inputs.version }}
+      use-ckan: true
+      artifacts: GameData/JustReadTheInstructions
+    secrets: inherit
