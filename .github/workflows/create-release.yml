@@ -41,9 +41,15 @@ jobs:
         id: update-version
         uses: KSPModdingLibs/KSPBuildTools/.github/actions/update-version@1.1.1
         with:
-          version-string: ${{ steps.normalize.outputs.tag }}
+          version-string: ${{ steps.normalize.outputs.bare }}
           template-extension: ''
           changelog-input-file: CHANGELOG.md
+
+      - name: Add v prefix to changelog heading
+        run: |
+          BARE="${{ steps.normalize.outputs.bare }}"
+          sed -i "s/^## ${BARE}/## v${BARE}/" CHANGELOG.md
+          git add CHANGELOG.md
 
       - name: Commit and tag
         run: |
