@@ -41,7 +41,7 @@ jobs:
         id: update-version
         uses: KSPModdingLibs/KSPBuildTools/.github/actions/update-version@1.1.1
         with:
-          version-string: ${{ steps.normalize.outputs.bare }}
+          version-string: ${{ steps.normalize.outputs.tag }}
           template-extension: ''
           changelog-input-file: CHANGELOG.md
 
@@ -62,8 +62,8 @@ jobs:
         run: |
           mkdir -p "$RELEASE_STAGING"
           ZIP_NAME="JustReadTheInstructions-${VERSION_TAG}.zip"
-          cd "$GITHUB_WORKSPACE"
-          zip -r "$RELEASE_STAGING/$ZIP_NAME" GameData/JustReadTheInstructions -x "*.pdb"
+          cd "$GITHUB_WORKSPACE/GameData"
+          zip -r "$RELEASE_STAGING/$ZIP_NAME" JustReadTheInstructions -x "*.pdb"
           echo "ZIP_PATH=$RELEASE_STAGING/$ZIP_NAME" >> "$GITHUB_ENV"
 
       - name: Create release
