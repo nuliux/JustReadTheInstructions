@@ -1,22 +1,40 @@
 const DRAG_THRESHOLD = 5;
+const EDGE_ZONE = 80;
+const MAX_EDGE_SPEED = 14;
 
 export function enableDragOrder(container, onReorder) {
     let drag = null;
 
     const onMove = (e) => {
         if (!drag) return;
+
         if (!drag.active) {
             if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD) return;
             drag.active = true;
             _activate(drag, e);
         }
+
+        drag.curX = e.clientX;
+        drag.curY = e.clientY;
         drag.card.style.left = `${e.clientX - drag.offsetX}px`;
         drag.card.style.top = `${e.clientY - drag.offsetY}px`;
         _movePlaceholder(container, drag.placeholder, e.clientX, e.clientY);
+
+        const vy = e.clientY;
+        const vh = window.innerHeight;
+        if (vy < EDGE_ZONE) {
+            drag.edgeSpeed = -MAX_EDGE_SPEED * (1 - vy / EDGE_ZONE);
+        } else if (vy > vh - EDGE_ZONE) {
+            drag.edgeSpeed = MAX_EDGE_SPEED * (1 - (vh - vy) / EDGE_ZONE);
+        } else {
+            drag.edgeSpeed = 0;
+        }
+        _tickEdgeScroll(drag, container);
     };
 
     const onUp = () => {
         if (!drag) return;
+        cancelAnimationFrame(drag.edgeRaf);
         if (drag.active) {
             drag.card.removeAttribute('style');
             drag.placeholder.replaceWith(drag.card);
@@ -33,21 +51,46 @@ export function enableDragOrder(container, onReorder) {
         const card = e.target.closest('.camera-card');
         if (!card || !container.contains(card)) return;
         if (e.target.closest('button, a, input, select')) return;
-        if (e.pointerType === 'touch' && !e.target.closest('.preview')) return;
+
+        const isTouch = e.pointerType === 'touch';
+        if (isTouch && !e.target.closest('.drag-handle')) return;
+
+        e.preventDefault();
 
         drag = {
             card,
             placeholder: null,
             startX: e.clientX,
             startY: e.clientY,
+            curX: e.clientX,
+            curY: e.clientY,
             offsetX: 0,
             offsetY: 0,
             active: false,
+            edgeSpeed: 0,
+            edgeRaf: null,
         };
-        window.addEventListener('pointermove', onMove);
+
+        window.addEventListener('pointermove', onMove, { passive: false });
         window.addEventListener('pointerup', onUp);
         window.addEventListener('pointercancel', onUp);
     });
+}
+
+function _tickEdgeScroll(drag, container) {
+    if (drag.edgeRaf) return;
+    if (!drag.edgeSpeed) return;
+
+    const loop = () => {
+        if (!drag?.active || !drag.edgeSpeed) {
+            drag && (drag.edgeRaf = null);
+            return;
+        }
+        window.scrollBy(0, drag.edgeSpeed);
+        _movePlaceholder(container, drag.placeholder, drag.curX, drag.curY);
+        drag.edgeRaf = requestAnimationFrame(loop);
+    };
+    drag.edgeRaf = requestAnimationFrame(loop);
 }
 
 function _activate(drag, e) {

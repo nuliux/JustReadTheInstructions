@@ -104,7 +104,31 @@ h1 {
     aspect-ratio: 16 / 9;
     background: var(--bg);
     overflow: hidden;
+    -webkit-touch-callout: none;
+}
+
+.drag-handle {
+    display: none;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 44px;
+    height: 44px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 8px;
+    align-items: center;
+    justify-content: center;
     touch-action: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    z-index: 10;
+    cursor: grab;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 20px;
+}
+
+@media (hover: none) {
+    .drag-handle { display: flex; }
 }
 
     .preview img {

@@ -151,7 +151,12 @@ export class CameraCard {
         recBadge.className = 'rec-badge';
         recBadge.innerHTML = '<span class="rec-dot"></span><span data-role="rec-label">REC</span>';
 
-        preview.append(img, offlineOverlay, recBadge);
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'drag-handle';
+        dragHandle.title = 'Drag to reorder';
+        dragHandle.innerHTML = '<i class="fa-solid fa-hand"></i>';
+
+        preview.append(img, offlineOverlay, recBadge, dragHandle);
         return preview;
     }
 
