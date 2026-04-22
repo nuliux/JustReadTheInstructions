@@ -25,8 +25,8 @@ namespace JustReadTheInstructions
         public static bool IsLoaded { get; private set; }
 
         public static int StreamPort { get; internal set; } = 8080;
-        public static int StreamJpegQuality { get; internal set; } = 75;
-        public static int StreamMaxFps { get; internal set; } = 24;
+        public static int StreamJpegQuality { get; internal set; } = 90;
+        public static int StreamMaxFps { get; internal set; } = 30;
 
         public static bool EnableDeferred { get; internal set; } = true;
         public static bool EnableTUFX { get; internal set; } = true;
