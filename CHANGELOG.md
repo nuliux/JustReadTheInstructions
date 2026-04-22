@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Drag the in-game preview by the camera image (on large screens, it can be difficult to target the title bar with the mouse...)
 - More space for the streaming label
 
 ## v2.1.0 - 2026-04-22

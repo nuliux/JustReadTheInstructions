@@ -201,6 +201,8 @@ namespace JustReadTheInstructions
                 RecalculateWindowSize();
                 _windowRect.width = _windowWidth;
                 _windowRect.height = _windowHeight;
+
+                Event.current.Use();
             }
 
             if (!_minimalUI)
@@ -211,7 +213,19 @@ namespace JustReadTheInstructions
 
             HandleResize();
 
-            GUI.DragWindow(new Rect(0, 0, _windowWidth - ButtonSize - 4, TitleBarHeight));
+            Rect dragRect = new Rect(0, 0, _windowWidth - ButtonSize - 4, TitleBarHeight);
+
+            dragRect = Rect.MinMaxRect(
+                0,
+                0,
+                Mathf.Max(dragRect.xMax, previewRect.xMax),
+                Mathf.Max(dragRect.yMax, previewRect.yMax)
+            );
+
+            if (!(Event.current.type == EventType.MouseDown && Event.current.clickCount == 2))
+            {
+                GUI.DragWindow(dragRect);
+            }
         }
 
         private void DrawTelemetry(Rect previewRect)
