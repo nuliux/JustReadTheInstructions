@@ -74,6 +74,96 @@ h1 {
     margin-bottom: 0.75rem;
 }
 
+.groups-bar {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.group-btn {
+    border-color: var(--gc, var(--border));
+    color: var(--gc, var(--text-dim));
+    font-variant-numeric: tabular-nums;
+    transition: background 0.1s, color 0.1s, opacity 0.15s;
+}
+
+    .group-btn:hover {
+        background: color-mix(in srgb, var(--gc, var(--border)) 15%, transparent);
+    }
+
+    .group-btn--active {
+        background: var(--gc, var(--border));
+        color: #fff;
+    }
+
+        .group-btn--active:hover {
+            background: color-mix(in srgb, var(--gc) 80%, #fff);
+        }
+
+.group-strip {
+    height: 3px;
+    width: 100%;
+    background: var(--border);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: height 0.12s;
+}
+
+    .group-strip--assigned {
+        height: 4px;
+    }
+
+    .camera-card:hover .group-strip {
+        height: 6px;
+    }
+
+.group-assign-btn {
+    color: var(--text-muted);
+    border-color: var(--border);
+    font-variant-numeric: tabular-nums;
+    min-width: 2rem;
+    justify-content: center;
+}
+
+.btn-overflow {
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+.overflow-menu {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    z-index: 200;
+    min-width: 150px;
+    overflow: hidden;
+}
+
+.overflow-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.4rem 0.65rem;
+    font-family: inherit;
+    font-size: 0.7rem;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+}
+
+    .overflow-item:hover {
+        background: var(--surface-2);
+        color: var(--accent);
+    }
+
+    .overflow-item + .overflow-item {
+        border-top: 1px solid var(--border);
+    }
+
 .camera-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -199,11 +289,10 @@ h1 {
 }
 
 .camera-info {
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem 0.75rem 0.55rem;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 .camera-name {

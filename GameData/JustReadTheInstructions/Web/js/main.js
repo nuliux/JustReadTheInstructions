@@ -3,12 +3,14 @@ import { fetchCameras } from './api.js';
 import { CameraCard } from './camera-card.js';
 import { mountSettingsUI } from './settings-ui.js';
 import { enableDragOrder } from './drag-order.js';
+import { RecordingGroups } from './recording-groups.js';
 
 const KNOWN_CAMERAS_KEY = 'jrti-known-cameras';
 const LAUNCH_ID_KEY = 'jrti-launch-id';
 const ORDER_KEY = 'jrti-camera-order';
 
 const cards = new Map();
+const groups = new RecordingGroups(() => cards);
 
 const liveContainer = document.getElementById('cameras-live');
 const offlineSection = document.getElementById('cameras-offline-section');
@@ -71,6 +73,7 @@ function restoreKnownCameras() {
             });
             card.markDestroyed();
             cards.set(id, card);
+            groups.syncCard(card);
             insertOrdered(offlineContainer, card.el, savedOrder.offline);
         }
         offlineSection.hidden = stored.length === 0;
@@ -123,11 +126,13 @@ async function sync() {
         } else {
             const card = new CameraCard(cam);
             cards.set(cam.id, card);
+            groups.syncCard(card);
             insertOrdered(liveContainer, card.el, savedOrder.live);
         }
     }
 
     persistKnownCameras();
+    groups.refresh();
 
     const hasOffline = [...cards.values()].some(c => c.destroyed);
     offlineSection.hidden = !hasOffline;
@@ -147,6 +152,7 @@ function wireLifecycle() {
 
 async function main() {
     mountSettingsUI();
+    groups.mount(document.getElementById('groups-bar'));
     wireLifecycle();
     await checkLaunchId();
     loadOrder();

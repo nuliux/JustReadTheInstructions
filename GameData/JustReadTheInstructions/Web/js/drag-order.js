@@ -120,22 +120,24 @@ function _activate(drag, e) {
 }
 
 function _movePlaceholder(container, placeholder, cx, cy) {
+    const phRect = placeholder.getBoundingClientRect();
+    if (cx >= phRect.left && cx <= phRect.right && cy >= phRect.top && cy <= phRect.bottom) return;
+
     const cards = [...container.querySelectorAll('.camera-card')];
     if (!cards.length) return;
 
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = Infinity;
     for (const c of cards) {
         const r = c.getBoundingClientRect();
-        const d = Math.hypot(cx - (r.left + r.width / 2), cy - (r.top + r.height / 2));
-        if (d < bestDist) { bestDist = d; best = c; }
+        const dy = cy < r.top ? r.top - cy : cy > r.bottom ? cy - r.bottom : 0;
+        const dx = cx < r.left ? r.left - cx : cx > r.right ? cx - r.right : 0;
+        const score = dy * 4 + dx;
+        if (score < bestScore) { bestScore = score; best = c; }
     }
 
     if (!best) return;
     const r = best.getBoundingClientRect();
-    const midY = r.top + r.height / 2;
-    const midX = r.left + r.width / 2;
-    const insertBefore = cy < midY - r.height * 0.1
-        || (Math.abs(cy - midY) <= r.height * 0.1 && cx <= midX);
+    const insertBefore = cy < r.top + r.height / 2;
     insertBefore ? best.before(placeholder) : best.after(placeholder);
 }

@@ -21,14 +21,56 @@ function makeButton({ label, className = 'btn', role, title, onClick }) {
     return btn;
 }
 
-function makeCopyButton({ label, title, getText }) {
-    const btn = makeButton({ label, title });
-    btn.addEventListener('click', async () => {
-        const ok = await copyToClipboard(getText());
-        btn.textContent = ok ? 'Copied!' : 'Manual Copy';
-        setTimeout(() => { btn.textContent = label; }, 1500);
+let _overflowCloseListenerAdded = false;
+
+function makeOverflowMenu(items) {
+    if (!_overflowCloseListenerAdded) {
+        _overflowCloseListenerAdded = true;
+        document.addEventListener('pointerdown', (e) => {
+            if (!e.target.closest('.overflow-wrapper') && !e.target.closest('.overflow-menu'))
+                document.querySelectorAll('.overflow-menu:not([hidden])').forEach(m => m.hidden = true);
+        }, true);
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'overflow-wrapper';
+
+    const btn = makeButton({ label: '···', className: 'btn btn-overflow', title: 'More options' });
+
+    const menu = document.createElement('div');
+    menu.className = 'overflow-menu';
+    menu.hidden = true;
+    document.body.appendChild(menu);
+
+    const reposition = () => {
+        const r = btn.getBoundingClientRect();
+        menu.style.right = `${window.innerWidth - r.right}px`;
+        menu.style.bottom = `${window.innerHeight - r.top + 4}px`;
+    };
+
+    for (const { label, getText } of items) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'overflow-item';
+        item.textContent = label;
+        item.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const ok = await copyToClipboard(getText());
+            item.textContent = ok ? '✓ Copied' : 'Manual Copy';
+            setTimeout(() => { item.textContent = label; menu.hidden = true; }, 1200);
+        });
+        menu.appendChild(item);
+    }
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.overflow-menu:not([hidden])').forEach(m => { if (m !== menu) m.hidden = true; });
+        if (menu.hidden) reposition();
+        menu.hidden = !menu.hidden;
     });
-    return btn;
+
+    wrapper.appendChild(btn);
+    return wrapper;
 }
 
 export class CameraCard {
@@ -130,8 +172,27 @@ export class CameraCard {
         const card = document.createElement('div');
         card.className = 'camera-card offline';
         card.dataset.id = this.id;
-        card.append(this._buildPreview(), this._buildInfo(), this._buildFooter());
+
+        this.groupStripEl = document.createElement('div');
+        this.groupStripEl.className = 'group-strip';
+        this.groupStripEl.title = 'Click to assign recording group (cycles G1 → G2 → G3 → G4 → none)';
+
+        card.append(this.groupStripEl, this._buildPreview(), this._buildInfo(), this._buildFooter());
         return card;
+    }
+
+    setGroupStrip(groupId, color) {
+        this.groupStripEl.style.background = color ?? '';
+        this.groupStripEl.classList.toggle('group-strip--assigned', groupId !== null);
+
+        const label = groupId !== null ? `G${groupId + 1}` : 'Grp';
+        this.groupBtnEl.textContent = label;
+        this.groupBtnEl.style.borderColor = color ?? '';
+        this.groupBtnEl.style.color = color ?? '';
+    }
+
+    startRecording() {
+        this._startRecording();
     }
 
     _buildPreview() {
@@ -197,18 +258,14 @@ export class CameraCard {
         });
         pauseBtn.hidden = true;
 
-        const copyBtn = makeCopyButton({
-            label: 'Copy URL',
-            getText: () => location.origin + this.streamUrl,
-        });
+        this.groupBtnEl = makeButton({ label: 'Grp', className: 'btn group-assign-btn', title: 'Click to assign a recording group (G1–G4). Cameras in the same group can be started/stopped together.' });
 
-        const rawCopyBtn = makeCopyButton({
-            label: 'Copy Raw',
-            title: 'For OBS and other external feeds',
-            getText: () => location.origin + API.stream(this.id),
-        });
+        const moreMenu = makeOverflowMenu([
+            { label: 'Copy Viewer URL', getText: () => location.origin + this.streamUrl },
+            { label: 'Copy Stream URL', getText: () => location.origin + API.stream(this.id) },
+        ]);
 
-        actions.append(watchBtn, recBtn, pauseBtn, copyBtn, rawCopyBtn);
+        actions.append(watchBtn, recBtn, pauseBtn, this.groupBtnEl, moreMenu);
         info.append(name, actions);
         return info;
     }

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Settings menu now auto-saves instead of requiring the user to click "Save" (which is now removed), and applies changes immediately without needing to close the menu
+- Cleaned up disposition of Web UI
 
 ### Added
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mod version label in settings menu
 - Minimal UI option in settings
 - Fixed preview aspect ratio when `FixedPreviewAspectRatio` is enabled, so it doesn't stretch to fit the container (user setting)
+- Added recording groups to allow recording a select subset of cameras within a group
 
 ### Fixed
 
